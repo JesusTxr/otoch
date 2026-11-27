@@ -62,7 +62,10 @@ export default async function AppLayout({
         </main>
       </div>
 
-      <TabBar circulosActivos={usuario?.circulosActivos ?? 0} />
+      <TabBar
+        circulosActivos={usuario?.circulosActivos ?? 0}
+        rol={usuario?.rol}
+      />
     </div>
   );
 }

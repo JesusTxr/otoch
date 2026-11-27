@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, LogOut, MessageCircle, User, Users } from "lucide-react";
+import {
+  House,
+  LogOut,
+  MessageCircle,
+  Plus,
+  User,
+  Users,
+} from "lucide-react";
 import { cerrarSesionAction } from "@/app/actions/auth";
 import { OtochAvatar } from "@/components/otoch/avatar";
 import { OtochLogo } from "@/components/otoch/logo";
@@ -10,19 +17,28 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UsuarioSesionResumen } from "@/types/database";
 
-const NAV_ITEMS = [
-  { href: "/explorar", label: "Explorar", icon: House },
-  { href: "/roomies", label: "Roomies", icon: Users },
-  { href: "/circulos", label: "Círculos", icon: MessageCircle, badgeKey: true },
-  { href: "/perfil", label: "Perfil", icon: User },
-] as const;
-
 interface SideNavProps {
   usuario: UsuarioSesionResumen | null;
 }
 
 export function SideNav({ usuario }: SideNavProps) {
   const pathname = usePathname();
+  const esArrendador = usuario?.rol === "arrendador";
+
+  const navItems = [
+    { href: "/explorar", label: "Explorar", icon: House, badge: 0 },
+    ...(esArrendador
+      ? [{ href: "/mis-inmuebles", label: "Mis inmuebles", icon: Plus, badge: 0 }]
+      : []),
+    { href: "/roomies", label: "Roomies", icon: Users, badge: 0 },
+    {
+      href: "/circulos",
+      label: "Círculos",
+      icon: MessageCircle,
+      badge: usuario?.circulosActivos ?? 0,
+    },
+    { href: "/perfil", label: "Perfil", icon: User, badge: 0 },
+  ];
 
   return (
     <aside
@@ -35,14 +51,10 @@ export function SideNav({ usuario }: SideNavProps) {
         </div>
 
         <nav aria-label="Secciones principales" className="flex flex-col gap-1.5">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const badgeCount =
-              "badgeKey" in item && item.badgeKey
-                ? (usuario?.circulosActivos ?? 0)
-                : 0;
 
             return (
               <Link
@@ -74,9 +86,9 @@ export function SideNav({ usuario }: SideNavProps) {
                   </span>
                 </span>
 
-                {badgeCount > 0 && (
+                {item.badge > 0 && (
                   <span className="inline-flex min-w-[22px] items-center justify-center rounded-pill bg-primary px-2 py-0.5 text-etiqueta font-semibold text-primary-foreground">
-                    {badgeCount}
+                    {item.badge}
                   </span>
                 )}
               </Link>
@@ -89,18 +101,24 @@ export function SideNav({ usuario }: SideNavProps) {
         <div className="flex flex-col gap-3 rounded-sm bg-canvas p-4">
           <div className="flex flex-col gap-1">
             <p className="text-pequeno font-semibold text-foreground">
-              ¿Tienes un cuarto en renta?
+              {esArrendador
+                ? "Publica una nueva propiedad"
+                : "¿Tienes un cuarto en renta?"}
             </p>
             <p className="text-etiqueta text-text-secondary">
-              Publícalo gratis y recibe solo estudiantes verificados.
+              {esArrendador
+                ? "Recibe interesados verificados y haz match directo."
+                : "Publícalo gratis y recibe solo estudiantes verificados."}
             </p>
           </div>
           <Button variant="secondary" size="sm" className="w-full" asChild>
             <Link
               href={
-                usuario
-                  ? "/perfil"
-                  : "/registro?rol=arrendador"
+                esArrendador
+                  ? "/mis-inmuebles/nuevo"
+                  : usuario
+                    ? "/perfil"
+                    : "/registro?rol=arrendador"
               }
             >
               Publicar inmueble

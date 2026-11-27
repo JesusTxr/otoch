@@ -2,29 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, MessageCircle, User, Users } from "lucide-react";
+import { House, MessageCircle, Plus, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const TAB_ITEMS = [
-  { href: "/explorar", label: "Explorar", icon: House },
-  { href: "/roomies", label: "Roomies", icon: Users },
-  { href: "/circulos", label: "Círculos", icon: MessageCircle },
-  { href: "/perfil", label: "Perfil", icon: User },
-] as const;
+import type { RolUsuario } from "@/types/database";
 
 interface TabBarProps {
   circulosActivos?: number;
+  rol?: RolUsuario | null;
 }
 
-export function TabBar({ circulosActivos = 0 }: TabBarProps) {
+export function TabBar({ circulosActivos = 0, rol }: TabBarProps) {
   const pathname = usePathname();
+
+  const tabItems =
+    rol === "arrendador"
+      ? [
+          { href: "/explorar", label: "Explorar", icon: House },
+          { href: "/mis-inmuebles", label: "Inmuebles", icon: Plus },
+          { href: "/circulos", label: "Círculos", icon: MessageCircle },
+          { href: "/perfil", label: "Perfil", icon: User },
+        ]
+      : [
+          { href: "/explorar", label: "Explorar", icon: House },
+          { href: "/roomies", label: "Roomies", icon: Users },
+          { href: "/circulos", label: "Círculos", icon: MessageCircle },
+          { href: "/perfil", label: "Perfil", icon: User },
+        ];
 
   return (
     <nav
       aria-label="Navegación inferior móvil"
       className="fixed inset-x-0 bottom-0 z-40 flex h-[84px] items-center justify-around border-t border-border bg-surface px-2 pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      {TAB_ITEMS.map((item) => {
+      {tabItems.map((item) => {
         const Icon = item.icon;
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);

@@ -1,55 +1,80 @@
-import Link from "next/link";
-import { House, MapPin, ShieldCheck, Users } from "lucide-react";
-import { VerifiedBadge } from "@/components/otoch/verified-badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { obtenerIniciales } from "@/components/otoch/avatar";
+import {
+  cargarInmueblesPublicados,
+  cargarUniversidadesConCoords,
+} from "@/lib/inmuebles-queries";
+import { createClient } from "@/lib/supabase/server";
+import type { RolUsuario } from "@/types/database";
+import { ExplorarClient } from "./explorar-client";
 
-export default function ExplorarPage() {
+export const metadata: Metadata = {
+  title: "Explorar inmuebles · Otoch",
+};
+
+export default async function ExplorarPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?next=/explorar");
+  }
+
+  const [
+    { data: perfil },
+    { data: estudiante },
+    { data: misSwipesInmuebles },
+    universidades,
+    inmueblesPublicados,
+  ] = await Promise.all([
+    supabase
+      .from("perfiles")
+      .select("id, rol, nombre, apellidos")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("perfiles_estudiante")
+      .select("universidad_id, presupuesto_max")
+      .eq("perfil_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("swipes")
+      .select("inmueble_id")
+      .eq("autor_id", user.id)
+      .is("perfil_objetivo_id", null)
+      .not("inmueble_id", "is", null),
+    cargarUniversidadesConCoords(supabase),
+    cargarInmueblesPublicados(supabase),
+  ]);
+
+  if (!perfil) {
+    redirect("/onboarding");
+  }
+
+  const yaEvaluadosSet = new Set(
+    (misSwipesInmuebles ?? [])
+      .map((s) => s.inmueble_id)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  // Excluir inmuebles propios del arrendador o ya evaluados por el usuario
+  const disponibles = inmueblesPublicados.filter(
+    (inm) => inm.arrendador_id !== user.id && !yaEvaluadosSet.has(inm.id)
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-titulo-web text-foreground">Explorar</h1>
-          <p className="mt-1 flex items-center gap-1.5 text-pequeno text-text-secondary">
-            <MapPin className="size-4 text-primary" aria-hidden="true" />
-            Mérida, Yucatán · Cuartos y casas verificadas cerca de tu escuela
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/perfil">Ver mi perfil</Link>
-        </Button>
-      </div>
-
-      <Card className="items-start gap-4 rounded-xl p-8 shadow-card">
-        <VerifiedBadge label="Catálogo verificado Otoch" />
-        <div className="flex size-12 items-center justify-center rounded-sm bg-primary-soft text-primary-strong">
-          <House className="size-6" aria-hidden="true" />
-        </div>
-        <h2 className="text-titulo-1 text-foreground">
-          ¡Tu cuenta y perfil ya están listos!
-        </h2>
-        <p className="max-w-[580px] text-cuerpo text-text-secondary">
-          Aquí aparecerán las tarjetas interactivas de inmuebles cercanos a tu
-          universidad con filtro por distancia PostGIS y presupuesto mensual.
-          Mientras tanto puedes revisar o actualizar tus preferencias en tu
-          perfil.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Button asChild>
-            <Link href="/perfil">Ir a mi perfil</Link>
-          </Button>
-          <Button variant="secondary" asChild>
-            <Link href="/roomies">
-              <Users className="size-4" aria-hidden="true" />
-              Ver roomies compatibles
-            </Link>
-          </Button>
-        </div>
-        <p className="flex items-center gap-1.5 text-etiqueta text-verde">
-          <ShieldCheck className="size-4" aria-hidden="true" />
-          Nunca deposites antes de firmar el acuerdo dentro de Otoch.
-        </p>
-      </Card>
-    </div>
+    <ExplorarClient
+      usuarioIniciales={obtenerIniciales(perfil.nombre, perfil.apellidos)}
+      rolUsuario={perfil.rol as RolUsuario}
+      universidadPreferidaId={estudiante?.universidad_id ?? null}
+      presupuestoEstudiante={
+        estudiante ? Number(estudiante.presupuesto_max) : null
+      }
+      universidades={universidades}
+      inmueblesIniciales={disponibles}
+    />
   );
 }

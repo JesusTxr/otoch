@@ -5,11 +5,21 @@ export type EstadoVerificacion = "pendiente" | "verificado" | "rechazado";
 export type HorarioSueno = "temprano" | "regular" | "nocturno";
 export type PreferenciaRoomie = "indistinto" | "mismo_genero";
 export type TipoArrendador = "persona_fisica" | "inmobiliaria";
+export type TipoInmueble = "casa" | "departamento" | "cuarto";
+export type EstadoInmueble = "borrador" | "publicado" | "pausado" | "rentado";
+export type DecisionSwipe = "me_interesa" | "descartar";
+export type TipoMatch = "estudiante_inmueble" | "roomies";
+export type EstadoMatch = "activo" | "archivado";
 export type TipoVerificacion =
   | "correo_institucional"
   | "identidad"
   | "propiedad";
 export type EstadoRevision = "pendiente" | "aprobada" | "rechazada";
+
+export interface Coordenadas {
+  lat: number;
+  lng: number;
+}
 
 export interface Universidad {
   id: string;
@@ -17,6 +27,7 @@ export interface Universidad {
   siglas: string | null;
   campus: string | null;
   dominio_correo: string | null;
+  ubicacion?: unknown;
   activa: boolean;
 }
 
@@ -77,6 +88,95 @@ export interface PerfilArrendador {
   nombre_comercial: string | null;
   identidad_verificada: boolean;
   propiedad_verificada: boolean;
+}
+
+export interface FotoInmueble {
+  id: string;
+  inmueble_id: string;
+  ruta_storage: string;
+  orden: number;
+  creado_en: string;
+}
+
+export interface Inmueble {
+  id: string;
+  arrendador_id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipo: TipoInmueble;
+  colonia: string;
+  direccion_privada?: string | null;
+  ubicacion: unknown;
+  renta_mensual: number;
+  deposito: number;
+  capacidad: number;
+  habitaciones: number;
+  banos: number;
+  amueblado: boolean;
+  servicios_incluidos: string[];
+  reglas: string | null;
+  disponible_desde: string;
+  estado: EstadoInmueble;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface InmuebleConDetalle extends Inmueble {
+  coordenadas: Coordenadas;
+  fotosUrls: string[];
+  rentaPorPersona: number;
+  arrendadorNombre: string;
+  arrendadorIniciales: string;
+  arrendadorVerificado: boolean;
+  interesadosCount: number;
+}
+
+export interface Swipe {
+  id: number;
+  autor_id: string;
+  inmueble_id: string | null;
+  perfil_objetivo_id: string | null;
+  decision: DecisionSwipe;
+  creado_en: string;
+}
+
+export interface Match {
+  id: string;
+  tipo: TipoMatch;
+  perfil_a_id: string;
+  perfil_b_id: string;
+  inmueble_id: string | null;
+  compatibilidad: number | null;
+  estado: EstadoMatch;
+  creado_en: string;
+}
+
+export interface RoomieCandidato {
+  perfilId: string;
+  nombre: string;
+  apellidos: string;
+  iniciales: string;
+  edad: number;
+  genero: Genero | null;
+  biografia: string | null;
+  verificado: boolean;
+  universidadId: string;
+  universidadSiglas: string;
+  municipioOrigen: string | null;
+  carrera: string;
+  periodoActual: number | null;
+  presupuestoMax: number;
+  fechaMudanza: string | null;
+  maxRoomies: number;
+  preferencias: PreferenciasConvivencia;
+  compatibilidadTotal: number;
+  desglose: {
+    horarios: number;
+    limpieza: number;
+    presupuesto: number;
+    ruidoVisitas: number;
+    mascotas: number;
+  };
 }
 
 export interface Verificacion {

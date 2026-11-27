@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, User } from "lucide-react";
+import { ChevronDown, LogOut, Plus, User } from "lucide-react";
 import { cerrarSesionAction } from "@/app/actions/auth";
 import { OtochAvatar } from "@/components/otoch/avatar";
 import { OtochLogo } from "@/components/otoch/logo";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UsuarioSesionResumen } from "@/types/database";
 
-const APP_LINKS = [
+const BASE_APP_LINKS = [
   { href: "/explorar", label: "Explorar" },
   { href: "/roomies", label: "Roomies" },
   { href: "/circulos", label: "Círculos" },
@@ -30,6 +30,17 @@ export function PublicNavbar({
   const pathname = usePathname();
   const [menuAbierto, setMenuAbierto] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+
+  const appLinks =
+    usuario?.rol === "arrendador"
+      ? [
+          { href: "/explorar", label: "Explorar" },
+          { href: "/mis-inmuebles", label: "Mis inmuebles" },
+          { href: "/roomies", label: "Roomies" },
+          { href: "/circulos", label: "Círculos" },
+          { href: "/perfil", label: "Perfil" },
+        ]
+      : BASE_APP_LINKS;
 
   React.useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -74,7 +85,7 @@ export function PublicNavbar({
             </>
           ) : null}
 
-          {APP_LINKS.map((link) => {
+          {appLinks.map((link) => {
             const active =
               pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
@@ -122,7 +133,7 @@ export function PublicNavbar({
               {menuAbierto && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-60 rounded-sm border border-border bg-surface p-2 shadow-card z-50"
+                  className="absolute right-0 z-50 mt-2 w-60 rounded-sm border border-border bg-surface p-2 shadow-card"
                 >
                   <div className="border-b border-border px-3 py-2">
                     <p className="truncate text-pequeno font-semibold text-foreground">
@@ -132,6 +143,18 @@ export function PublicNavbar({
                       {usuario.email}
                     </p>
                   </div>
+
+                  {usuario.rol === "arrendador" && (
+                    <Link
+                      href="/mis-inmuebles"
+                      role="menuitem"
+                      onClick={() => setMenuAbierto(false)}
+                      className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
+                    >
+                      <Plus className="size-4 text-primary" aria-hidden="true" />
+                      Mis inmuebles
+                    </Link>
+                  )}
 
                   <Link
                     href={usuario.rol ? "/perfil" : "/onboarding"}
@@ -161,11 +184,7 @@ export function PublicNavbar({
               <Button variant="outline" size="sm" asChild>
                 <Link href="/login">Iniciar sesión</Link>
               </Button>
-              <Button
-                size="sm"
-                className="hidden sm:inline-flex"
-                asChild
-              >
+              <Button size="sm" className="hidden sm:inline-flex" asChild>
                 <Link href="/registro">Registrarse</Link>
               </Button>
             </>
