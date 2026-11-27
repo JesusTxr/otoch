@@ -41,10 +41,12 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v2
+        with:
+          version: latest
       - run: pnpm install --frozen-lockfile
       - name: Base de datos local con migraciones y RLS
-        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime && supabase db reset
+        run: supabase start && supabase db reset
       - name: Verificar que todas las tablas tengan RLS (lección LA-01)
         run: |
           if ! command -v psql >/dev/null 2>&1; then
