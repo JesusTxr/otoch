@@ -37,9 +37,18 @@ export function RegistroForm({ rolInicial }: RegistroFormProps) {
     {}
   );
   const [oauthError, setOauthError] = React.useState<string | null>(null);
+  const [aceptaLegales, setAceptaLegales] = React.useState(false);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     setOauthError(null);
+    if (!aceptaLegales) {
+      e.preventDefault();
+      setClientErrors({
+        legales:
+          "Debes aceptar los Términos y Condiciones y el Aviso de Privacidad.",
+      });
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     const parsed = registroSchema.safeParse({
       email: String(formData.get("email") ?? ""),
@@ -253,6 +262,49 @@ export function RegistroForm({ rolInicial }: RegistroFormProps) {
                 />
                 {confirmError && (
                   <p className="text-etiqueta text-danger">{confirmError}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5 rounded-xs bg-canvas p-3">
+                <label className="flex cursor-pointer items-start gap-2.5 text-etiqueta text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={aceptaLegales}
+                    onChange={(e) => {
+                      setAceptaLegales(e.target.checked);
+                      if (e.target.checked && clientErrors.legales) {
+                        setClientErrors((prev) => {
+                          const copia = { ...prev };
+                          delete copia.legales;
+                          return copia;
+                        });
+                      }
+                    }}
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+                    required
+                  />
+                  <span>
+                    He leído y acepto los{" "}
+                    <Link
+                      href="/terminos"
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      Términos y Condiciones
+                    </Link>{" "}
+                    y el{" "}
+                    <Link
+                      href="/privacidad"
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      Aviso de Privacidad Integral (LFPDPPP)
+                    </Link>{" "}
+                    de Otoch.
+                  </span>
+                </label>
+                {clientErrors.legales && (
+                  <p className="text-etiqueta font-semibold text-danger">
+                    {clientErrors.legales}
+                  </p>
                 )}
               </div>
 

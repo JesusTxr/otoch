@@ -31,23 +31,29 @@ export const obtenerResumenSesion = cache(
       }
 
       const supabase = await createClient();
-      const [perfilRes, estRes, circulosCountRes] = await Promise.all([
-        supabase
-          .from("perfiles")
-          .select("id, rol, nombre, apellidos, estado_verificacion")
-          .eq("id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("perfiles_estudiante")
-          .select("universidad_id, universidades(siglas)")
-          .eq("perfil_id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("miembros_circulo")
-          .select("*", { count: "exact", head: true })
-          .eq("perfil_id", user.id)
-          .eq("estado", "activo"),
-      ]);
+      const [perfilRes, estRes, circulosCountRes, notifCountRes] =
+        await Promise.all([
+          supabase
+            .from("perfiles")
+            .select("id, rol, nombre, apellidos, estado_verificacion")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("perfiles_estudiante")
+            .select("universidad_id, universidades(siglas)")
+            .eq("perfil_id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("miembros_circulo")
+            .select("*", { count: "exact", head: true })
+            .eq("perfil_id", user.id)
+            .eq("estado", "activo"),
+          supabase
+            .from("notificaciones")
+            .select("*", { count: "exact", head: true })
+            .eq("perfil_id", user.id)
+            .eq("leida", false),
+        ]);
 
       const perfil = perfilRes.data;
       if (!perfil) {
@@ -61,6 +67,7 @@ export const obtenerResumenSesion = cache(
           subtitulo: "Completar registro",
           verificado: false,
           circulosActivos: 0,
+          notificacionesNoLeidas: 0,
         };
       }
 
@@ -85,7 +92,9 @@ export const obtenerResumenSesion = cache(
         }
       }
 
-      const verificado = perfil.estado_verificacion === "verificado";
+      const verificado =
+        perfil.estado_verificacion === "verificado" ||
+        perfil.rol === "administrador";
       const estadoTexto = verificado
         ? "Verificado"
         : perfil.estado_verificacion === "rechazado"
@@ -101,6 +110,7 @@ export const obtenerResumenSesion = cache(
         subtitulo: `${etiquetaRol} · ${estadoTexto}`,
         verificado,
         circulosActivos: circulosCountRes.count ?? 0,
+        notificacionesNoLeidas: notifCountRes.count ?? 0,
       };
     } catch {
       return null;

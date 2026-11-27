@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, MessageCircle, Plus, User, Users } from "lucide-react";
+import {
+  House,
+  MessageCircle,
+  Plus,
+  ShieldCheck,
+  User,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RolUsuario } from "@/types/database";
 
@@ -22,12 +29,19 @@ export function TabBar({ circulosActivos = 0, rol }: TabBarProps) {
           { href: "/circulos", label: "Círculos", icon: MessageCircle },
           { href: "/perfil", label: "Perfil", icon: User },
         ]
-      : [
-          { href: "/explorar", label: "Explorar", icon: House },
-          { href: "/roomies", label: "Roomies", icon: Users },
-          { href: "/circulos", label: "Círculos", icon: MessageCircle },
-          { href: "/perfil", label: "Perfil", icon: User },
-        ];
+      : rol === "administrador"
+        ? [
+            { href: "/explorar", label: "Explorar", icon: House },
+            { href: "/circulos", label: "Círculos", icon: MessageCircle },
+            { href: "/admin", label: "Admin", icon: ShieldCheck },
+            { href: "/perfil", label: "Perfil", icon: User },
+          ]
+        : [
+            { href: "/explorar", label: "Explorar", icon: House },
+            { href: "/roomies", label: "Roomies", icon: Users },
+            { href: "/circulos", label: "Círculos", icon: MessageCircle },
+            { href: "/perfil", label: "Perfil", icon: User },
+          ];
 
   return (
     <nav

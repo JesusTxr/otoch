@@ -26,6 +26,16 @@ export type TipoVerificacion =
   | "identidad"
   | "propiedad";
 export type EstadoRevision = "pendiente" | "aprobada" | "rechazada";
+export type EstadoReporte =
+  | "abierto"
+  | "en_revision"
+  | "resuelto"
+  | "descartado";
+export type CategoriaNotificacion =
+  | "nuevo_match"
+  | "mensaje"
+  | "acuerdo"
+  | "verificacion";
 
 export interface Coordenadas {
   lat: number;
@@ -311,6 +321,56 @@ export interface Verificacion {
   creado_en: string;
 }
 
+export interface Notificacion {
+  id: number;
+  perfil_id: string;
+  tipo: string;
+  titulo: string;
+  cuerpo: string | null;
+  datos: Record<string, unknown>;
+  leida: boolean;
+  creado_en: string;
+}
+
+export interface VerificacionModeracion extends Verificacion {
+  solicitanteNombre: string;
+  solicitanteIniciales: string;
+  solicitanteRol: RolUsuario;
+  solicitanteEstadoPerfil: EstadoVerificacion;
+  correoInstitucional: string | null;
+  universidadSiglas: string | null;
+  nombreComercial: string | null;
+}
+
+export interface ReporteModeracion {
+  id: string;
+  reportante_id: string;
+  reportanteNombre: string;
+  perfil_reportado_id: string | null;
+  perfilReportadoNombre: string | null;
+  inmueble_reportado_id: string | null;
+  inmuebleReportadoTitulo: string | null;
+  mensaje_id: number | null;
+  mensajeExtracto: string | null;
+  motivo: MotivoReporte;
+  descripcion: string | null;
+  estado: EstadoReporte;
+  resuelto_por: string | null;
+  creado_en: string;
+  resuelto_en: string | null;
+}
+
+export interface RegistroAuditoria {
+  id: number;
+  actor_id: string | null;
+  actorNombre: string;
+  accion: string;
+  entidad: string;
+  entidad_id: string | null;
+  detalle: Record<string, unknown>;
+  creado_en: string;
+}
+
 export interface UsuarioSesionResumen {
   id: string;
   email: string;
@@ -320,4 +380,5 @@ export interface UsuarioSesionResumen {
   subtitulo: string;
   verificado: boolean;
   circulosActivos: number;
+  notificacionesNoLeidas: number;
 }

@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   House,
   LogOut,
   MessageCircle,
   Plus,
+  ShieldCheck,
   User,
   Users,
 } from "lucide-react";
 import { cerrarSesionAction } from "@/app/actions/auth";
 import { OtochAvatar } from "@/components/otoch/avatar";
 import { OtochLogo } from "@/components/otoch/logo";
+import { NotificationBell } from "@/components/otoch/notification-bell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UsuarioSesionResumen } from "@/types/database";
@@ -24,6 +27,7 @@ interface SideNavProps {
 export function SideNav({ usuario }: SideNavProps) {
   const pathname = usePathname();
   const esArrendador = usuario?.rol === "arrendador";
+  const esAdmin = usuario?.rol === "administrador";
 
   const navItems = [
     { href: "/explorar", label: "Explorar", icon: House, badge: 0 },
@@ -37,6 +41,19 @@ export function SideNav({ usuario }: SideNavProps) {
       icon: MessageCircle,
       badge: usuario?.circulosActivos ?? 0,
     },
+    ...(usuario
+      ? [
+          {
+            href: "/notificaciones",
+            label: "Notificaciones",
+            icon: Bell,
+            badge: usuario.notificacionesNoLeidas ?? 0,
+          },
+        ]
+      : []),
+    ...(esAdmin
+      ? [{ href: "/admin", label: "Moderación", icon: ShieldCheck, badge: 0 }]
+      : []),
     { href: "/perfil", label: "Perfil", icon: User, badge: 0 },
   ];
 
@@ -46,8 +63,15 @@ export function SideNav({ usuario }: SideNavProps) {
       className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-[248px] lg:shrink-0 lg:flex-col lg:justify-between lg:border-r lg:border-border lg:bg-surface lg:px-4 lg:pb-6 lg:pt-7"
     >
       <div className="flex flex-col gap-7">
-        <div className="px-2">
+        <div className="flex items-center justify-between gap-2 px-2">
           <OtochLogo href="/" />
+          {usuario && (
+            <NotificationBell
+              usuarioId={usuario.id}
+              inicialNoLeidas={usuario.notificacionesNoLeidas}
+              placement="sidebar"
+            />
+          )}
         </div>
 
         <nav aria-label="Secciones principales" className="flex flex-col gap-1.5">
@@ -98,33 +122,35 @@ export function SideNav({ usuario }: SideNavProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 rounded-sm bg-canvas p-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-pequeno font-semibold text-foreground">
-              {esArrendador
-                ? "Publica una nueva propiedad"
-                : "¿Tienes un cuarto en renta?"}
-            </p>
-            <p className="text-etiqueta text-text-secondary">
-              {esArrendador
-                ? "Recibe interesados verificados y haz match directo."
-                : "Publícalo gratis y recibe solo estudiantes verificados."}
-            </p>
+        {!esAdmin && (
+          <div className="flex flex-col gap-3 rounded-sm bg-canvas p-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-pequeno font-semibold text-foreground">
+                {esArrendador
+                  ? "Publica una nueva propiedad"
+                  : "¿Tienes un cuarto en renta?"}
+              </p>
+              <p className="text-etiqueta text-text-secondary">
+                {esArrendador
+                  ? "Recibe interesados verificados y haz match directo."
+                  : "Publícalo gratis y recibe solo estudiantes verificados."}
+              </p>
+            </div>
+            <Button variant="secondary" size="sm" className="w-full" asChild>
+              <Link
+                href={
+                  esArrendador
+                    ? "/mis-inmuebles/nuevo"
+                    : usuario
+                      ? "/perfil"
+                      : "/registro?rol=arrendador"
+                }
+              >
+                Publicar inmueble
+              </Link>
+            </Button>
           </div>
-          <Button variant="secondary" size="sm" className="w-full" asChild>
-            <Link
-              href={
-                esArrendador
-                  ? "/mis-inmuebles/nuevo"
-                  : usuario
-                    ? "/perfil"
-                    : "/registro?rol=arrendador"
-              }
-            >
-              Publicar inmueble
-            </Link>
-          </Button>
-        </div>
+        )}
 
         {usuario ? (
           <div className="flex items-center justify-between gap-2 px-1">

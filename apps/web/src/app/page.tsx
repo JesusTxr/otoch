@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { OtochAvatar } from "@/components/otoch/avatar";
+import { PublicFooter } from "@/components/otoch/public-footer";
 import { PublicNavbar } from "@/components/otoch/public-navbar";
 import { TabBar } from "@/components/otoch/tab-bar";
 import { VerifiedBadge } from "@/components/otoch/verified-badge";
@@ -337,7 +338,12 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <TabBar circulosActivos={usuario?.circulosActivos ?? 0} />
+      <PublicFooter />
+
+      <TabBar
+        circulosActivos={usuario?.circulosActivos ?? 0}
+        rol={usuario?.rol}
+      />
     </div>
   );
 }

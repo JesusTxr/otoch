@@ -10,6 +10,8 @@ const PROTECTED_PREFIXES = [
   "/matches",
   "/roomies",
   "/circulos",
+  "/notificaciones",
+  "/admin",
   "/perfil",
   "/onboarding",
 ];

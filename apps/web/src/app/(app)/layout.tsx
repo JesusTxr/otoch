@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { cerrarSesionAction } from "@/app/actions/auth";
 import { OtochAvatar } from "@/components/otoch/avatar";
 import { OtochLogo } from "@/components/otoch/logo";
+import { NotificationBell } from "@/components/otoch/notification-bell";
 import { SideNav } from "@/components/otoch/side-nav";
 import { TabBar } from "@/components/otoch/tab-bar";
 import { obtenerResumenSesion } from "@/lib/supabase/session";
@@ -24,6 +25,11 @@ export default async function AppLayout({
           <OtochLogo href="/" />
           {usuario ? (
             <div className="flex items-center gap-2">
+              <NotificationBell
+                usuarioId={usuario.id}
+                inicialNoLeidas={usuario.notificacionesNoLeidas}
+                placement="header"
+              />
               <Link
                 href="/perfil"
                 className="inline-flex items-center gap-2 rounded-pill bg-canvas py-1 pl-1 pr-2.5"
@@ -33,7 +39,7 @@ export default async function AppLayout({
                   nombre={usuario.nombreCompleto}
                   size={30}
                 />
-                <span className="max-w-[110px] truncate text-etiqueta font-semibold text-foreground">
+                <span className="max-w-[96px] truncate text-etiqueta font-semibold text-foreground">
                   {usuario.nombreCompleto}
                 </span>
               </Link>

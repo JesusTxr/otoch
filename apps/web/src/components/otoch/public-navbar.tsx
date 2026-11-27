@@ -3,10 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, Plus, User } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Plus,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { cerrarSesionAction } from "@/app/actions/auth";
 import { OtochAvatar } from "@/components/otoch/avatar";
 import { OtochLogo } from "@/components/otoch/logo";
+import { NotificationBell } from "@/components/otoch/notification-bell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UsuarioSesionResumen } from "@/types/database";
@@ -40,7 +48,14 @@ export function PublicNavbar({
           { href: "/circulos", label: "Círculos" },
           { href: "/perfil", label: "Perfil" },
         ]
-      : BASE_APP_LINKS;
+      : usuario?.rol === "administrador"
+        ? [
+            { href: "/explorar", label: "Explorar" },
+            { href: "/circulos", label: "Círculos" },
+            { href: "/admin", label: "Moderación" },
+            { href: "/perfil", label: "Perfil" },
+          ]
+        : BASE_APP_LINKS;
 
   React.useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -108,77 +123,109 @@ export function PublicNavbar({
 
         <div className="flex items-center gap-2.5">
           {usuario ? (
-            <div ref={menuRef} className="relative">
-              <button
-                type="button"
-                aria-expanded={menuAbierto}
-                aria-haspopup="menu"
-                onClick={() => setMenuAbierto((prev) => !prev)}
-                className="inline-flex cursor-pointer items-center gap-2.5 rounded-pill border border-border bg-surface py-1.5 pl-1.5 pr-3 transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <OtochAvatar
-                  iniciales={usuario.iniciales}
-                  nombre={usuario.nombreCompleto}
-                  size={34}
-                />
-                <span className="hidden max-w-[140px] truncate text-pequeno font-semibold text-foreground sm:inline">
-                  {usuario.nombreCompleto}
-                </span>
-                <ChevronDown
-                  className="size-4 text-text-secondary"
-                  aria-hidden="true"
-                />
-              </button>
-
-              {menuAbierto && (
-                <div
-                  role="menu"
-                  className="absolute right-0 z-50 mt-2 w-60 rounded-sm border border-border bg-surface p-2 shadow-card"
+            <>
+              <NotificationBell
+                usuarioId={usuario.id}
+                inicialNoLeidas={usuario.notificacionesNoLeidas}
+                placement="header"
+              />
+              <div ref={menuRef} className="relative">
+                <button
+                  type="button"
+                  aria-expanded={menuAbierto}
+                  aria-haspopup="menu"
+                  onClick={() => setMenuAbierto((prev) => !prev)}
+                  className="inline-flex cursor-pointer items-center gap-2.5 rounded-pill border border-border bg-surface py-1.5 pl-1.5 pr-3 transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <div className="border-b border-border px-3 py-2">
-                    <p className="truncate text-pequeno font-semibold text-foreground">
-                      {usuario.nombreCompleto}
-                    </p>
-                    <p className="truncate text-etiqueta text-text-secondary">
-                      {usuario.email}
-                    </p>
-                  </div>
+                  <OtochAvatar
+                    iniciales={usuario.iniciales}
+                    nombre={usuario.nombreCompleto}
+                    size={34}
+                  />
+                  <span className="hidden max-w-[140px] truncate text-pequeno font-semibold text-foreground sm:inline">
+                    {usuario.nombreCompleto}
+                  </span>
+                  <ChevronDown
+                    className="size-4 text-text-secondary"
+                    aria-hidden="true"
+                  />
+                </button>
 
-                  {usuario.rol === "arrendador" && (
+                {menuAbierto && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 z-50 mt-2 w-60 rounded-sm border border-border bg-surface p-2 shadow-card"
+                  >
+                    <div className="border-b border-border px-3 py-2">
+                      <p className="truncate text-pequeno font-semibold text-foreground">
+                        {usuario.nombreCompleto}
+                      </p>
+                      <p className="truncate text-etiqueta text-text-secondary">
+                        {usuario.email}
+                      </p>
+                    </div>
+
+                    {usuario.rol === "administrador" && (
+                      <Link
+                        href="/admin"
+                        role="menuitem"
+                        onClick={() => setMenuAbierto(false)}
+                        className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
+                      >
+                        <ShieldCheck
+                          className="size-4 text-primary"
+                          aria-hidden="true"
+                        />
+                        Panel de moderación
+                      </Link>
+                    )}
+
+                    {usuario.rol === "arrendador" && (
+                      <Link
+                        href="/mis-inmuebles"
+                        role="menuitem"
+                        onClick={() => setMenuAbierto(false)}
+                        className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
+                      >
+                        <Plus className="size-4 text-primary" aria-hidden="true" />
+                        Mis inmuebles
+                      </Link>
+                    )}
+
                     <Link
-                      href="/mis-inmuebles"
+                      href="/notificaciones"
                       role="menuitem"
                       onClick={() => setMenuAbierto(false)}
                       className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
                     >
-                      <Plus className="size-4 text-primary" aria-hidden="true" />
-                      Mis inmuebles
+                      <Bell className="size-4 text-primary" aria-hidden="true" />
+                      Notificaciones
                     </Link>
-                  )}
 
-                  <Link
-                    href={usuario.rol ? "/perfil" : "/onboarding"}
-                    role="menuitem"
-                    onClick={() => setMenuAbierto(false)}
-                    className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
-                  >
-                    <User className="size-4 text-primary" aria-hidden="true" />
-                    {usuario.rol ? "Mi perfil" : "Completar onboarding"}
-                  </Link>
-
-                  <form action={cerrarSesionAction} className="mt-1">
-                    <button
-                      type="submit"
+                    <Link
+                      href={usuario.rol ? "/perfil" : "/onboarding"}
                       role="menuitem"
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xs px-3 py-2 text-left text-pequeno font-semibold text-danger transition-colors hover:bg-primary-soft/60"
+                      onClick={() => setMenuAbierto(false)}
+                      className="mt-1 flex items-center gap-2.5 rounded-xs px-3 py-2 text-pequeno font-semibold text-foreground transition-colors hover:bg-sunken"
                     >
-                      <LogOut className="size-4" aria-hidden="true" />
-                      Cerrar sesión
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
+                      <User className="size-4 text-primary" aria-hidden="true" />
+                      {usuario.rol ? "Mi perfil" : "Completar onboarding"}
+                    </Link>
+
+                    <form action={cerrarSesionAction} className="mt-1">
+                      <button
+                        type="submit"
+                        role="menuitem"
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xs px-3 py-2 text-left text-pequeno font-semibold text-danger transition-colors hover:bg-primary-soft/60"
+                      >
+                        <LogOut className="size-4" aria-hidden="true" />
+                        Cerrar sesión
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <Button variant="outline" size="sm" asChild>
