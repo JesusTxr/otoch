@@ -1,0 +1,143 @@
+/* =====================================================================
+   Otoch — Design tokens (fuente: Figma "Otoch — Prototipo web/móvil")
+   Variables de Figma: colección "Otoch / Color" · Estilos: "Otoch/…"
+   Pensado para Next.js 16 + Tailwind CSS v4 + shadcn/ui.
+
+   Uso: importa este archivo en app/globals.css DESPUÉS de
+   `@import "tailwindcss";`  →  @import "../design/tokens/tokens.css";
+   Fuente: Plus Jakarta Sans vía next/font/google (variable --font-jakarta).
+   ===================================================================== */
+
+:root {
+  /* ---------- Marca ---------- */
+  --otoch-primary: #D9532C;          /* brand/primary — CTA, activo, acentos */
+  --otoch-primary-strong: #B8401D;   /* brand/primary-strong — texto sobre primary-soft */
+  --otoch-primary-soft: #FBE3D9;     /* brand/primary-soft — fondos suaves, ítem activo */
+  --otoch-verde: #2F7D5B;            /* brand/verde — verificado, compatibilidad, traslado */
+  --otoch-verde-soft: #DDEFE6;       /* brand/verde-soft — fondos de avisos/insignias */
+  --otoch-oro: #E8A93B;              /* brand/oro — "súper", advertencias suaves */
+
+  /* ---------- Superficies ---------- */
+  --otoch-canvas: #FBF6F0;           /* bg/canvas — fondo de la app */
+  --otoch-surface: #FFFFFF;          /* bg/surface — tarjetas, barras */
+  --otoch-sunken: #F3EBE2;           /* bg/sunken — campos, chips neutros, barras de progreso */
+
+  /* ---------- Texto y bordes ---------- */
+  --otoch-text: #1F1A17;             /* text/primary */
+  --otoch-text-secondary: #6E635A;   /* text/secondary */
+  --otoch-text-inverse: #FFFFFF;     /* text/inverse */
+  --otoch-border: #E8DDD1;           /* border/default */
+  --otoch-danger: #C2412D;           /* state/danger — descartar, errores */
+
+  /* ---------- Radios ---------- */
+  --otoch-radius-pill: 999px;   /* chips, avatares, botones de acción, insignias */
+  --otoch-radius-xl: 28px;      /* tarjeta swipe web, modal, hoja inferior móvil */
+  --otoch-radius-lg: 24px;      /* tarjeta swipe móvil, tarjeta de reserva */
+  --otoch-radius-md: 20px;      /* tarjetas web, galería */
+  --otoch-radius-sm: 16px;      /* tarjetas secundarias, bloques de renta */
+  --otoch-radius-btn: 14px;     /* botones */
+  --otoch-radius-xs: 12px;      /* amenidades, contenedores de ícono */
+
+  /* ---------- Sombras ---------- */
+  --otoch-shadow-card: 0 10px 28px rgba(31, 26, 23, 0.14);
+  --otoch-shadow-action: 0 6px 18px rgba(31, 26, 23, 0.12);
+  --otoch-shadow-subtle: 0 4px 12px rgba(31, 26, 23, 0.06);
+  --otoch-shadow-sticky: 0 10px 30px rgba(31, 26, 23, 0.08);
+  --otoch-shadow-modal: 0 24px 60px rgba(31, 26, 23, 0.30);
+
+  /* ---------- Degradados ---------- */
+  --otoch-gradient-photo: linear-gradient(180deg, rgba(31,26,23,0) 45%, rgba(31,26,23,0.88) 100%);
+  --otoch-gradient-roomie: linear-gradient(180deg, #D9532C 0%, #E8A93B 100%);
+
+  /* ---------- Layout ---------- */
+  --otoch-sidebar-w: 248px;     /* navegación lateral web (≥1024px) */
+  --otoch-tabbar-h: 84px;       /* barra inferior móvil (<1024px) */
+
+  /* ---------- Puente shadcn/ui (mismos nombres que espera shadcn) ---------- */
+  --background: var(--otoch-canvas);
+  --foreground: var(--otoch-text);
+  --card: var(--otoch-surface);
+  --card-foreground: var(--otoch-text);
+  --popover: var(--otoch-surface);
+  --popover-foreground: var(--otoch-text);
+  --primary: var(--otoch-primary);
+  --primary-foreground: var(--otoch-text-inverse);
+  --secondary: var(--otoch-primary-soft);
+  --secondary-foreground: var(--otoch-primary-strong);
+  --muted: var(--otoch-sunken);
+  --muted-foreground: var(--otoch-text-secondary);
+  --accent: var(--otoch-primary-soft);
+  --accent-foreground: var(--otoch-primary-strong);
+  --destructive: var(--otoch-danger);
+  --border: var(--otoch-border);
+  --input: var(--otoch-border);
+  --ring: var(--otoch-primary);
+  --radius: 14px;
+}
+
+/* Tailwind v4: genera utilidades bg-primary, text-verde, rounded-card, etc. */
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Nombres propios de Otoch */
+  --color-primary-strong: var(--otoch-primary-strong);
+  --color-primary-soft: var(--otoch-primary-soft);
+  --color-verde: var(--otoch-verde);
+  --color-verde-soft: var(--otoch-verde-soft);
+  --color-oro: var(--otoch-oro);
+  --color-canvas: var(--otoch-canvas);
+  --color-surface: var(--otoch-surface);
+  --color-sunken: var(--otoch-sunken);
+  --color-text-secondary: var(--otoch-text-secondary);
+  --color-danger: var(--otoch-danger);
+
+  --radius-pill: var(--otoch-radius-pill);
+  --radius-xl: var(--otoch-radius-xl);
+  --radius-lg: var(--otoch-radius-lg);
+  --radius-md: var(--otoch-radius-md);
+  --radius-sm: var(--otoch-radius-sm);
+  --radius-btn: var(--otoch-radius-btn);
+  --radius-xs: var(--otoch-radius-xs);
+
+  --shadow-card: var(--otoch-shadow-card);
+  --shadow-action: var(--otoch-shadow-action);
+  --shadow-subtle: var(--otoch-shadow-subtle);
+  --shadow-sticky: var(--otoch-shadow-sticky);
+  --shadow-modal: var(--otoch-shadow-modal);
+
+  /* Escala tipográfica (tamaño / interlineado / tracking) — estilos "Otoch/…" de Figma */
+  --text-display-web: 56px;      --text-display-web--line-height: 62px; --text-display-web--letter-spacing: -1.4px; --text-display-web--font-weight: 800;
+  --text-titulo-web: 32px;       --text-titulo-web--line-height: 40px;  --text-titulo-web--letter-spacing: -0.6px;  --text-titulo-web--font-weight: 700;
+  --text-display: 30px;          --text-display--line-height: 36px;     --text-display--letter-spacing: -0.6px;     --text-display--font-weight: 800;
+  --text-titulo-1: 24px;         --text-titulo-1--line-height: 30px;    --text-titulo-1--letter-spacing: -0.4px;    --text-titulo-1--font-weight: 700;
+  --text-titulo-2: 18px;         --text-titulo-2--line-height: 24px;    --text-titulo-2--letter-spacing: -0.2px;    --text-titulo-2--font-weight: 700;
+  --text-cuerpo: 15px;           --text-cuerpo--line-height: 22px;
+  --text-pequeno: 13px;          --text-pequeno--line-height: 18px;
+  --text-etiqueta: 12px;         --text-etiqueta--line-height: 16px;    --text-etiqueta--letter-spacing: 0.1px;     --text-etiqueta--font-weight: 500;
+  --text-boton: 16px;            --text-boton--line-height: 20px;       --text-boton--font-weight: 700;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

@@ -1,0 +1,46 @@
+# Plantilla · Respaldo lógico horario de la base de datos hacia Cloudflare R2 (regla 3-2-1)
+# Copiar a .github/workflows/backup.yml en el repositorio y configurar los secretos indicados.
+name: respaldo-horario-bd
+
+on:
+  schedule:
+    - cron: "7 * * * *"        # cada hora (minuto 7, UTC)
+  workflow_dispatch: {}
+
+concurrency:
+  group: respaldo-bd
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Instalar cliente de PostgreSQL 17 y age
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update && sudo apt-get install -y postgresql-client-17 age
+
+      - name: Generar respaldo cifrado
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          STAMP=$(date -u +%Y%m%dT%H%MZ)
+          pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
+            | age -r "$BACKUP_AGE_RECIPIENT" > "otoch_${STAMP}.dump.age"
+          echo "ARCHIVO=otoch_${STAMP}.dump.age" >> "$GITHUB_ENV"
+
+      - name: Subir a Cloudflare R2 (prefijo horario)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp "$ARCHIVO" "s3://${{ secrets.R2_BUCKET }}/bd/horario/$ARCHIVO" \
+            --endpoint-url "${{ secrets.R2_ENDPOINT }}"
+
+# La retención (48 horarias, 30 diarias, 12 semanales y 12 mensuales) se aplica con reglas de
+# ciclo de vida del bucket y con un trabajo diario que copia el último respaldo a los prefijos diario/semanal/mensual.

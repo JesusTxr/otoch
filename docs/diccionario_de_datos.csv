@@ -1,0 +1,177 @@
+﻿tabla,campo,tipo,restricciones,descripcion
+universidades,id,uuid,PK def. UUID,Identificador único.
+universidades,nombre,text,NOT NULL,Nombre oficial de la institución.
+universidades,siglas,varchar(20),,"Siglas de la institución (p. ej., UTM, UADY)."
+universidades,campus,text,,Nombre o referencia del campus.
+universidades,dominio_correo,varchar(100),unique,Dominio del correo institucional para verificar estudiantes.
+universidades,ubicacion,"geography(Point,4326)",NOT NULL,Coordenadas del campus (PostGIS) para filtrar por distancia.
+universidades,activa,boolean,NOT NULL default true,Indica si se muestra en el catálogo.
+universidades,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de alta.
+municipios,id,smallint,PK,Identificador del municipio.
+municipios,clave_inegi,char(3),NOT NULL unique,Clave municipal del Marco Geoestadístico del INEGI.
+municipios,nombre,text,NOT NULL,Nombre oficial del municipio.
+municipios,distancia_merida_km,"numeric(6,1)",check (distancia_merida_km >= 0),Distancia aproximada por carretera a Mérida (analítica).
+perfiles,id,uuid,PK FK → auth.users(id) (cascada),Mismo identificador del usuario en Supabase Auth.
+perfiles,rol,rol_usuario,NOT NULL,"Rol en la plataforma: estudiante, arrendador o administrador."
+perfiles,nombre,varchar(80),NOT NULL,Nombre(s).
+perfiles,apellidos,varchar(120),NOT NULL,Apellidos.
+perfiles,fecha_nacimiento,date,NOT NULL check (fecha_nacimiento <= current_date - interval '18 years'),Valida la mayoría de edad (18 años o más).
+perfiles,genero,genero,,Dato opcional; solo se usa si la persona activa la preferencia de roomies del mismo género.
+perfiles,telefono,varchar(20),,Teléfono de contacto; visible únicamente dentro de un círculo.
+perfiles,foto_ruta,text,,Ruta de la foto de perfil en Storage.
+perfiles,biografia,varchar(500),,Presentación breve.
+perfiles,estado_verificacion,estado_verificacion,NOT NULL default 'pendiente',Resultado global de la verificación de identidad.
+perfiles,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de registro.
+perfiles,actualizado_en,timestamptz,NOT NULL def. now(),Última actualización.
+perfiles,eliminado_en,timestamptz,,Baja lógica para atender solicitudes de cancelación (derechos ARCO).
+perfiles_estudiante,perfil_id,uuid,PK FK → perfiles(id) (cascada),Perfil al que pertenece (relación 1:1).
+perfiles_estudiante,universidad_id,uuid,NOT NULL FK → universidades(id),Institución donde estudia.
+perfiles_estudiante,municipio_origen_id,smallint,FK → municipios(id),Municipio de residencia familiar.
+perfiles_estudiante,carrera,varchar(120),,Programa académico.
+perfiles_estudiante,periodo_actual,smallint,check (periodo_actual between 1 and 12),Cuatrimestre o semestre que cursa.
+perfiles_estudiante,correo_institucional,varchar(120),unique,Correo verificado con el dominio de la universidad.
+perfiles_estudiante,presupuesto_max,"numeric(10,2)",NOT NULL check (presupuesto_max > 0),Monto mensual máximo para su parte de la renta (MXN).
+perfiles_estudiante,fecha_mudanza,date,,Fecha deseada de mudanza.
+perfiles_estudiante,busca_roomies,boolean,NOT NULL default true,Indica si desea compartir vivienda.
+perfiles_estudiante,max_roomies,smallint,NOT NULL default 3 check (max_roomies between 1 and 5),Número máximo de personas con quienes compartiría.
+preferencias_convivencia,perfil_id,uuid,PK FK → perfiles_estudiante(perfil_id) (cascada),Estudiante que responde (1:1).
+preferencias_convivencia,horario_sueno,horario_sueno,NOT NULL,"Horario de descanso: temprano, regular o nocturno."
+preferencias_convivencia,limpieza,smallint,NOT NULL check (limpieza between 1 and 5),Nivel de orden y limpieza esperado (escala 1-5).
+preferencias_convivencia,tolerancia_ruido,smallint,NOT NULL check (tolerancia_ruido between 1 and 5),Tolerancia al ruido (1-5).
+preferencias_convivencia,frecuencia_visitas,smallint,NOT NULL check (frecuencia_visitas between 1 and 5),Frecuencia esperada de visitas (1-5).
+preferencias_convivencia,estudia_en_casa,smallint,NOT NULL check (estudia_en_casa between 1 and 5),Tiempo de estudio en casa (1-5).
+preferencias_convivencia,fuma,boolean,NOT NULL default false,Indica si fuma.
+preferencias_convivencia,tiene_mascota,boolean,NOT NULL default false,Indica si tiene mascota.
+preferencias_convivencia,acepta_mascotas,boolean,NOT NULL default true,Acepta convivir con mascotas.
+preferencias_convivencia,preferencia_roomie,preferencia_roomie,NOT NULL default 'indistinto',Preferencia sobre el género de sus roomies.
+preferencias_convivencia,intereses,text[],NOT NULL default '{}',"Etiquetas de intereses (música, deporte, videojuegos, etc.)."
+preferencias_convivencia,actualizado_en,timestamptz,NOT NULL def. now(),Última actualización del cuestionario.
+perfiles_arrendador,perfil_id,uuid,PK FK → perfiles(id) (cascada),Perfil al que pertenece (1:1).
+perfiles_arrendador,tipo,tipo_arrendador,NOT NULL,Persona física o inmobiliaria.
+perfiles_arrendador,nombre_comercial,varchar(120),,Nombre comercial (solo inmobiliarias).
+perfiles_arrendador,identidad_verificada,boolean,NOT NULL default false,La identificación oficial fue revisada y aprobada.
+perfiles_arrendador,propiedad_verificada,boolean,NOT NULL default false,Se acreditó la propiedad o la facultad para arrendar.
+inmuebles,id,uuid,PK def. UUID,Identificador único.
+inmuebles,arrendador_id,uuid,NOT NULL FK → perfiles_arrendador(perfil_id),Arrendador que publica.
+inmuebles,titulo,varchar(120),NOT NULL,Título del anuncio.
+inmuebles,descripcion,text,,Descripción detallada.
+inmuebles,tipo,tipo_inmueble,NOT NULL,"Casa, departamento o cuarto."
+inmuebles,colonia,varchar(120),NOT NULL,Colonia o fraccionamiento (dato público).
+inmuebles,direccion_privada,text,,Dirección exacta; solo visible para miembros de un círculo.
+inmuebles,ubicacion,"geography(Point,4326)",NOT NULL,Coordenadas; en público se muestran con desplazamiento aproximado.
+inmuebles,renta_mensual,"numeric(10,2)",NOT NULL check (renta_mensual > 0),Renta total mensual (MXN).
+inmuebles,deposito,"numeric(10,2)",NOT NULL default 0 check (deposito >= 0),Depósito en garantía (MXN).
+inmuebles,capacidad,smallint,NOT NULL check (capacidad between 1 and 8),Número máximo de ocupantes.
+inmuebles,habitaciones,smallint,NOT NULL check (habitaciones >= 1),Número de habitaciones.
+inmuebles,banos,"numeric(3,1)",NOT NULL check (banos > 0),Número de baños (admite medios baños).
+inmuebles,amueblado,boolean,NOT NULL default false,Indica si se renta amueblado.
+inmuebles,servicios_incluidos,text[],NOT NULL default '{}',"Servicios incluidos en la renta (agua, luz, gas, internet)."
+inmuebles,reglas,text,,Reglas de la vivienda.
+inmuebles,disponible_desde,date,NOT NULL,Fecha a partir de la cual se puede ocupar.
+inmuebles,estado,estado_inmueble,NOT NULL default 'borrador',"Borrador, publicado, pausado o rentado."
+inmuebles,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de creación.
+inmuebles,actualizado_en,timestamptz,NOT NULL def. now(),Última actualización.
+fotos_inmueble,id,uuid,PK def. UUID,Identificador único.
+fotos_inmueble,inmueble_id,uuid,NOT NULL FK → inmuebles(id) (cascada),Inmueble al que pertenece.
+fotos_inmueble,ruta_storage,text,NOT NULL,Ruta del archivo en el bucket inmuebles.
+fotos_inmueble,orden,smallint,NOT NULL default 0,Posición en la galería.
+fotos_inmueble,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de carga.
+swipes,id,bigint,identidad PK,Identificador secuencial.
+swipes,autor_id,uuid,NOT NULL FK → perfiles(id) (cascada),Persona que toma la decisión.
+swipes,inmueble_id,uuid,FK → inmuebles(id) (cascada),Inmueble evaluado (o contexto de la evaluación).
+swipes,perfil_objetivo_id,uuid,FK → perfiles(id) (cascada),Persona evaluada (posible roomie o interesado).
+swipes,decision,decision_swipe,NOT NULL,Me interesa o descartar.
+swipes,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de la decisión.
+matches,id,uuid,PK def. UUID,Identificador único.
+matches,tipo,tipo_match,NOT NULL,Estudiante-inmueble o roomies.
+matches,perfil_a_id,uuid,NOT NULL FK → perfiles(id) (cascada),Estudiante (o primer roomie).
+matches,perfil_b_id,uuid,NOT NULL FK → perfiles(id) (cascada),Arrendador (o segundo roomie).
+matches,inmueble_id,uuid,FK → inmuebles(id) (cascada),Inmueble asociado (obligatorio en estudiante-inmueble).
+matches,compatibilidad,"numeric(5,2)",check (compatibilidad between 0 and 100),Puntaje de compatibilidad al momento del match (%).
+matches,estado,estado_match,NOT NULL default 'activo',Activo o archivado.
+matches,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora del match.
+circulos,id,uuid,PK def. UUID,Identificador único.
+circulos,inmueble_id,uuid,NOT NULL FK → inmuebles(id),Inmueble en negociación.
+circulos,creado_por,uuid,NOT NULL FK → perfiles(id),Persona que creó el círculo.
+circulos,nombre,varchar(80),,Nombre visible del círculo.
+circulos,cupo,smallint,NOT NULL check (cupo between 2 and 6),Número máximo de estudiantes.
+circulos,estado,estado_circulo,NOT NULL default 'abierto',"Abierto, en acuerdo, cerrado o cancelado."
+circulos,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de creación.
+circulos,actualizado_en,timestamptz,NOT NULL def. now(),Última actualización.
+miembros_circulo,circulo_id,uuid,FK → circulos(id) (cascada),Círculo (parte de la llave primaria).
+miembros_circulo,perfil_id,uuid,FK → perfiles(id) (cascada),Integrante (parte de la llave primaria).
+miembros_circulo,rol,rol_circulo,NOT NULL,Arrendador o estudiante.
+miembros_circulo,estado,estado_miembro,NOT NULL default 'invitado',"Invitado, activo o salió."
+miembros_circulo,unido_en,timestamptz,,Fecha y hora en que aceptó la invitación.
+mensajes,id,bigint,identidad PK,Identificador secuencial.
+mensajes,circulo_id,uuid,NOT NULL FK → circulos(id) (cascada),Círculo al que pertenece la conversación.
+mensajes,autor_id,uuid,FK → perfiles(id) (set null),Autor; nulo en mensajes del sistema.
+mensajes,tipo,tipo_mensaje,NOT NULL default 'texto',"Texto, imagen o sistema."
+mensajes,contenido,varchar(2000),,Texto del mensaje.
+mensajes,adjunto_ruta,text,,Ruta de la imagen adjunta en Storage.
+mensajes,eliminado,boolean,NOT NULL default false,Borrado lógico por su autor o por moderación.
+mensajes,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de envío.
+acuerdos,id,uuid,PK def. UUID,Identificador único.
+acuerdos,circulo_id,uuid,NOT NULL FK → circulos(id),Círculo que negocia.
+acuerdos,version,smallint,NOT NULL default 1,Versión del pre-acuerdo (única por círculo).
+acuerdos,renta_total,"numeric(10,2)",NOT NULL check (renta_total > 0),Renta mensual total pactada (MXN).
+acuerdos,deposito_total,"numeric(10,2)",NOT NULL default 0,Depósito total pactado (MXN).
+acuerdos,servicios_estimados,"numeric(10,2)",NOT NULL default 0,Gasto mensual estimado de servicios (MXN).
+acuerdos,fecha_inicio,date,NOT NULL,Inicio del arrendamiento.
+acuerdos,duracion_meses,smallint,NOT NULL check (duracion_meses between 1 and 24),Duración pactada en meses.
+acuerdos,clausulas,jsonb,NOT NULL default '[]',Condiciones y reglas de convivencia acordadas.
+acuerdos,estado,estado_acuerdo,NOT NULL default 'borrador',"Borrador, propuesto, aceptado o rechazado."
+acuerdos,pdf_ruta,text,,Ruta del PDF del pre-acuerdo generado.
+acuerdos,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de creación.
+acuerdos,actualizado_en,timestamptz,NOT NULL def. now(),Última actualización.
+aportaciones,acuerdo_id,uuid,FK → acuerdos(id) (cascada),Pre-acuerdo (parte de la llave primaria).
+aportaciones,perfil_id,uuid,FK → perfiles(id),Estudiante que aporta (parte de la llave primaria).
+aportaciones,porcentaje,"numeric(5,2)",NOT NULL check (porcentaje > 0 and porcentaje <= 100),Proporción que le corresponde (%).
+aportaciones,monto_renta,"numeric(10,2)",NOT NULL,Monto mensual de renta a su cargo (MXN).
+aportaciones,monto_deposito,"numeric(10,2)",NOT NULL default 0,Parte del depósito a su cargo (MXN).
+aportaciones,aceptado_en,timestamptz,,Fecha y hora en que aceptó el reparto.
+verificaciones,id,uuid,PK def. UUID,Identificador único.
+verificaciones,perfil_id,uuid,NOT NULL FK → perfiles(id) (cascada),Persona que solicita la verificación.
+verificaciones,tipo,tipo_verificacion,NOT NULL,"Correo institucional, identidad o propiedad."
+verificaciones,estado,estado_revision,NOT NULL default 'pendiente',"Pendiente, aprobada o rechazada."
+verificaciones,evidencia_ruta,text,,Ruta temporal del documento en un bucket privado; se elimina al concluir la revisión.
+verificaciones,revisado_por,uuid,FK → perfiles(id),Administrador que revisó.
+verificaciones,revisado_en,timestamptz,,Fecha y hora de la revisión.
+verificaciones,motivo_rechazo,varchar(300),,Motivo en caso de rechazo.
+verificaciones,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de la solicitud.
+reportes,id,uuid,PK def. UUID,Identificador único.
+reportes,reportante_id,uuid,NOT NULL FK → perfiles(id),Persona que reporta.
+reportes,perfil_reportado_id,uuid,FK → perfiles(id),Persona reportada (opcional).
+reportes,inmueble_reportado_id,uuid,FK → inmuebles(id),Anuncio reportado (opcional).
+reportes,mensaje_id,bigint,FK → mensajes(id),Mensaje reportado (opcional).
+reportes,motivo,motivo_reporte,NOT NULL,"Fraude, acoso, contenido inapropiado, suplantación u otro."
+reportes,descripcion,varchar(1000),,Detalle aportado por quien reporta.
+reportes,estado,estado_reporte,NOT NULL default 'abierto',"Abierto, en revisión, resuelto o descartado."
+reportes,resuelto_por,uuid,FK → perfiles(id),Moderador que atendió el reporte.
+reportes,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora del reporte.
+reportes,resuelto_en,timestamptz,,Fecha y hora de resolución.
+bloqueos,bloqueador_id,uuid,FK → perfiles(id) (cascada),Quien bloquea (parte de la llave primaria).
+bloqueos,bloqueado_id,uuid,FK → perfiles(id) (cascada),Persona bloqueada (parte de la llave primaria).
+bloqueos,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora del bloqueo.
+notificaciones,id,bigint,identidad PK,Identificador secuencial.
+notificaciones,perfil_id,uuid,NOT NULL FK → perfiles(id) (cascada),Destinatario.
+notificaciones,tipo,varchar(40),NOT NULL,"Categoría (nuevo_match, mensaje, acuerdo, verificacion)."
+notificaciones,titulo,varchar(120),NOT NULL,Título visible.
+notificaciones,cuerpo,varchar(500),,Texto de la notificación.
+notificaciones,datos,jsonb,NOT NULL default '{}',Datos para la navegación (identificadores relacionados).
+notificaciones,leida,boolean,NOT NULL default false,Indica si ya fue leída.
+notificaciones,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de emisión.
+suscripciones_push,id,uuid,PK def. UUID,Identificador único.
+suscripciones_push,perfil_id,uuid,NOT NULL FK → perfiles(id) (cascada),Propietario de la suscripción.
+suscripciones_push,endpoint,text,NOT NULL unique,URL del servicio push del navegador.
+suscripciones_push,p256dh,text,NOT NULL,Llave pública de cifrado del navegador.
+suscripciones_push,auth,text,NOT NULL,Secreto de autenticación de la suscripción.
+suscripciones_push,user_agent,varchar(300),,Navegador y dispositivo.
+suscripciones_push,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora de registro.
+auditoria,id,bigint,identidad PK,Identificador secuencial.
+auditoria,actor_id,uuid,FK → perfiles(id) (set null),Persona que ejecutó la acción.
+auditoria,accion,varchar(60),NOT NULL,"Operación realizada (p. ej., verificacion.aprobada)."
+auditoria,entidad,varchar(60),NOT NULL,Tabla o recurso afectado.
+auditoria,entidad_id,text,,Identificador del registro afectado.
+auditoria,detalle,jsonb,NOT NULL default '{}',Datos de contexto (sin información sensible).
+auditoria,creado_en,timestamptz,NOT NULL def. now(),Fecha y hora del evento.

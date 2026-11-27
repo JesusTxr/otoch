@@ -1,0 +1,51 @@
+# Plantilla · Integración continua para pull requests y ramas principales
+# Copiar a .github/workflows/ci.yml en el repositorio.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint y tipos
+        run: pnpm lint && pnpm typecheck
+      - name: Pruebas unitarias con cobertura
+        run: pnpm test -- --coverage
+      - name: Compilación
+        run: pnpm --filter web build
+      - name: Auditoría de dependencias (falla con vulnerabilidades altas o críticas)
+        run: pnpm audit --audit-level=high
+
+  e2e:
+    needs: calidad
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+      - run: pnpm install --frozen-lockfile
+      - name: Base de datos local con migraciones y RLS
+        run: supabase start && supabase db reset
+      - name: Verificar que todas las tablas tengan RLS (lección LA-01)
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -tAc \
+            "select count(*) from pg_tables where schemaname='public' and not rowsecurity" | grep -qx 0
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
