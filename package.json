@@ -1,0 +1,19 @@
+{
+  "name": "otoch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Otoch — Vivienda verificada y roomies compatibles para estudiantes foráneos en Mérida, Yucatán.",
+  "packageManager": "pnpm@12.23.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "test": "pnpm --filter web test",
+    "test:e2e": "pnpm --filter web test:e2e"
+  }
+}
