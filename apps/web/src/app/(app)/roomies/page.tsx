@@ -6,6 +6,7 @@ import {
   calcularEdadDesdeFecha,
 } from "@/lib/compatibilidad";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 import type {
   Genero,
   PreferenciasConvivencia,
@@ -23,17 +24,14 @@ interface RoomiesPageProps {
 }
 
 export default async function RoomiesPage({ searchParams }: RoomiesPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/roomies");
   }
 
+  const [supabase, params] = await Promise.all([createClient(), searchParams]);
+
   const [
-    params,
     { data: miPerfil },
     { data: miEst },
     { data: misPref },
@@ -41,8 +39,8 @@ export default async function RoomiesPage({ searchParams }: RoomiesPageProps) {
     { data: otrosEstudiantes },
     { data: universidades },
     { data: municipios },
+    inmuebleCtxRes,
   ] = await Promise.all([
-    searchParams,
     supabase
       .from("perfiles")
       .select("id, nombre, apellidos, genero")
@@ -77,21 +75,20 @@ export default async function RoomiesPage({ searchParams }: RoomiesPageProps) {
       .eq("activa", true)
       .order("siglas", { ascending: true }),
     supabase.from("municipios").select("id, nombre"),
+    params.inmueble
+      ? supabase
+          .from("inmuebles")
+          .select("titulo")
+          .eq("id", params.inmueble)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!miPerfil) {
     redirect("/onboarding");
   }
 
-  let inmuebleContextoTitulo: string | null = null;
-  if (params.inmueble) {
-    const { data: inm } = await supabase
-      .from("inmuebles")
-      .select("titulo")
-      .eq("id", params.inmueble)
-      .maybeSingle();
-    inmuebleContextoTitulo = inm?.titulo ?? null;
-  }
+  const inmuebleContextoTitulo = inmuebleCtxRes.data?.titulo ?? null;
 
   const yaEvaluadosSet = new Set(
     (misSwipesRoomies ?? [])
@@ -143,7 +140,6 @@ export default async function RoomiesPage({ searchParams }: RoomiesPageProps) {
     const pr = prefMap.get(est.perfil_id);
     if (!p || !pr) continue;
 
-    // Respetar preferencia de mismo género si alguno la activó y ambos indicaron género
     if (
       misPreferencias?.preferencia_roomie === "mismo_genero" &&
       miPerfil.genero &&

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   AlertTriangle,
   Ban,
@@ -10,6 +10,7 @@ import {
   Flag,
   Image as ImageIcon,
   MapPin,
+  RefreshCw,
   Send,
   ShieldAlert,
 } from "lucide-react";
@@ -18,7 +19,7 @@ import {
   enviarMensajeCirculoAction,
   reportarEnCirculoAction,
 } from "@/app/actions/circulos";
-import { OtochAvatar } from "@/components/otoch/avatar";
+import { OtochAvatar, obtenerIniciales } from "@/components/otoch/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +36,16 @@ import type {
   MiembroCirculoDetalle,
   MotivoReporte,
 } from "@/types/database";
+
+interface AutorResuelto {
+  nombreCompleto: string;
+  iniciales: string;
+  esArrendador: boolean;
+}
+
+interface MensajeChatUI extends MensajeChat {
+  optimista?: boolean;
+}
 
 interface CirculoChatRoomProps {
   circuloId: string;
@@ -91,18 +102,18 @@ export function CirculoChatRoom({
   integrantes,
   mensajesIniciales,
 }: CirculoChatRoomProps) {
-  const router = useRouter();
-  const [mensajesRealtime, setMensajesRealtime] = React.useState<MensajeChat[]>(
-    []
-  );
+  const [mensajesExtra, setMensajesExtra] = React.useState<MensajeChatUI[]>([]);
+  const [autoresExtra, setAutoresExtra] = React.useState<
+    Record<string, AutorResuelto>
+  >({});
   const [texto, setTexto] = React.useState("");
-  const [enviando, setEnviando] = React.useState(false);
   const [subiendoImg, setSubiendoImg] = React.useState(false);
+  const [reintentoClave, setReintentoClave] = React.useState(0);
   const [estadoRealtime, setEstadoRealtime] = React.useState<
     "conectando" | "en_vivo" | "reconectando"
   >("conectando");
 
-  // Estados de moderación (Reportar / Bloquear)
+  // Moderación (Reportar / Bloquear)
   const [modalModeracion, setModalModeracion] = React.useState(false);
   const [perfilObjetivoMod, setPerfilObjetivoMod] = React.useState<string>("");
   const [mensajeReportadoId, setMensajeReportadoId] = React.useState<
@@ -114,73 +125,166 @@ export function CirculoChatRoom({
   const [avisoChat, setAvisoChat] = React.useState<string | null>(null);
 
   const bottomRef = React.useRef<HTMLDivElement>(null);
+  const channelRef = React.useRef<RealtimeChannel | null>(null);
+  const integrantesLookupRef = React.useRef<Map<string, AutorResuelto>>(
+    new Map()
+  );
 
+  // Mapa en memoria de integrantes del círculo para resolver nombre/avatar sin JOIN en Realtime
+  const integranteMap = React.useMemo(() => {
+    const map = new Map<string, AutorResuelto>();
+    for (const i of integrantes) {
+      map.set(i.perfil_id, {
+        nombreCompleto: i.nombreCompleto,
+        iniciales: i.iniciales,
+        esArrendador: i.rol === "arrendador",
+      });
+    }
+    return map;
+  }, [integrantes]);
+
+  React.useEffect(() => {
+    integrantesLookupRef.current = integranteMap;
+  }, [integranteMap]);
+
+  // Combinar mensajes iniciales + mensajes optimistas / Realtime evitando duplicados por id
   const mensajes = React.useMemo(() => {
     const vistos = new Set<number>();
-    const combinados: MensajeChat[] = [];
-    for (const m of [...mensajesIniciales, ...mensajesRealtime]) {
+    const combinados: MensajeChatUI[] = [];
+    for (const m of [...mensajesIniciales, ...mensajesExtra]) {
       if (!m.eliminado && !vistos.has(m.id)) {
         vistos.add(m.id);
         combinados.push(m);
       }
     }
     return combinados;
-  }, [mensajesIniciales, mensajesRealtime]);
+  }, [mensajesIniciales, mensajesExtra]);
 
-  // Auto-scroll suave al llegar nuevos mensajes
+  // Auto-scroll suave al final de la conversación
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes.length]);
 
-  // Suscripción en tiempo real a postgres_changes sobre mensajes filtrada por circulo_id
+  // Suscripción única por círculo a Supabase Realtime (`circulo-chat-${circuloId}`)
   React.useEffect(() => {
     let cancelado = false;
     const supabase = createClient();
+    const channelName = `circulo-chat-${circuloId}`;
+    let activeChannel: RealtimeChannel | null = null;
 
-    const channel = supabase
-      .channel(`circulo-mensajes-${circuloId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "mensajes",
-          filter: `circulo_id=eq.${circuloId}`,
-        },
-        (payload) => {
-          if (cancelado) return;
-          const nuevo = payload.new as MensajeChat;
-          if (nuevo.eliminado) return;
+    const resolverAutorFaltante = async (autorId: string | null) => {
+      if (!autorId || integrantesLookupRef.current.has(autorId)) return;
+      const { data: p } = await supabase
+        .from("perfiles")
+        .select("id, nombre, apellidos, rol")
+        .eq("id", autorId)
+        .maybeSingle();
+      if (!cancelado && p) {
+        setAutoresExtra((prev) =>
+          prev[p.id]
+            ? prev
+            : {
+                ...prev,
+                [p.id]: {
+                  nombreCompleto: `${p.nombre} ${p.apellidos}`.trim(),
+                  iniciales: obtenerIniciales(p.nombre, p.apellidos),
+                  esArrendador: p.rol === "arrendador",
+                },
+              }
+        );
+      }
+    };
 
-          setMensajesRealtime((prev) => {
-            if (prev.some((m) => m.id === nuevo.id)) return prev;
-            return [...prev, nuevo];
-          });
+    const incorporarMensajeEntrante = (nuevo: MensajeChat) => {
+      if (cancelado || !nuevo || nuevo.eliminado) return;
+      void resolverAutorFaltante(nuevo.autor_id);
+
+      setMensajesExtra((prev) => {
+        if (prev.some((m) => m.id === nuevo.id)) {
+          return prev;
         }
-      )
-      .subscribe((status) => {
-        if (cancelado) return;
-        if (status === "SUBSCRIBED") {
-          setEstadoRealtime("en_vivo");
-        } else if (
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT" ||
-          status === "CLOSED"
-        ) {
-          setEstadoRealtime("reconectando");
+        // Si existe un mensaje optimista propio idéntico aún pendiente, reemplazarlo
+        const idxOpt = prev.findIndex(
+          (m) =>
+            m.optimista &&
+            m.autor_id === nuevo.autor_id &&
+            m.tipo === nuevo.tipo &&
+            m.contenido === nuevo.contenido
+        );
+        if (idxOpt !== -1) {
+          const copia = [...prev];
+          copia[idxOpt] = nuevo;
+          return copia;
         }
+        return [...prev, nuevo];
       });
+    };
+
+    async function conectarCanal() {
+      setEstadoRealtime("conectando");
+
+      // Garantizar que el WebSocket de Realtime reciba el JWT autenticado del usuario
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelado) return;
+
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token);
+      }
+
+      const channel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: false },
+          },
+        })
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "mensajes",
+            filter: "circulo_id=eq." + circuloId,
+          },
+          (payload) => {
+            incorporarMensajeEntrante(payload.new as MensajeChat);
+          }
+        )
+        .on("broadcast", { event: "nuevo_mensaje" }, (evento) => {
+          const msg = evento.payload as MensajeChat | undefined;
+          if (msg && msg.circulo_id === circuloId) {
+            incorporarMensajeEntrante(msg);
+          }
+        })
+        .subscribe((status, err) => {
+          console.info(`[Otoch Realtime] ${channelName}:`, status, err ?? "");
+          if (cancelado) return;
+          if (status === "SUBSCRIBED") {
+            setEstadoRealtime("en_vivo");
+          } else if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            setEstadoRealtime("reconectando");
+          }
+        });
+
+      activeChannel = channel;
+      channelRef.current = channel;
+    }
+
+    void conectarCanal();
 
     return () => {
       cancelado = true;
-      void supabase.removeChannel(channel);
+      channelRef.current = null;
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel);
+      }
     };
-  }, [circuloId]);
-
-  const integranteMap = React.useMemo(
-    () => new Map(integrantes.map((i) => [i.perfil_id, i])),
-    [integrantes]
-  );
+  }, [circuloId, reintentoClave]);
 
   const otrosIntegrantes = integrantes.filter((i) => i.perfil_id !== userId);
   const estudiantesActivosCount = integrantes.filter(
@@ -201,21 +305,56 @@ export function CirculoChatRoom({
   async function handleEnviarTexto(e: React.FormEvent) {
     e.preventDefault();
     const limpio = texto.trim();
-    if (!limpio || enviando) return;
+    if (!limpio) return;
 
-    setEnviando(true);
+    setAvisoChat(null);
     setTexto("");
+
+    // UI Optimista: mostrar el mensaje al instante en el chat del emisor
+    const tempId = -Date.now() - Math.floor(Math.random() * 1000);
+    const mensajeOptimista: MensajeChatUI = {
+      id: tempId,
+      circulo_id: circuloId,
+      autor_id: userId,
+      tipo: "texto",
+      contenido: limpio,
+      adjunto_ruta: null,
+      eliminado: false,
+      creado_en: new Date().toISOString(),
+      optimista: true,
+    };
+
+    setMensajesExtra((prev) => [...prev, mensajeOptimista]);
+
     const res = await enviarMensajeCirculoAction({
       circuloId,
       tipo: "texto",
       contenido: limpio,
     });
-    setEnviando(false);
 
-    if (!res.ok) {
+    if (!res.ok || !res.mensajeInsertado) {
+      // Revertir burbuja optimista y devolver el texto al campo para no perderlo
+      setMensajesExtra((prev) => prev.filter((m) => m.id !== tempId));
       setTexto(limpio);
       setAvisoChat(res.error ?? "No se pudo enviar el mensaje.");
+      return;
     }
+
+    const confirmado = res.mensajeInsertado;
+    setMensajesExtra((prev) => {
+      const yaLlegoPorRealtime = prev.some((m) => m.id === confirmado.id);
+      if (yaLlegoPorRealtime) {
+        return prev.filter((m) => m.id !== tempId);
+      }
+      return prev.map((m) => (m.id === tempId ? confirmado : m));
+    });
+
+    // Notificar también por broadcast en el mismo canal para latencia sub-30ms
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "nuevo_mensaje",
+      payload: confirmado,
+    });
   }
 
   async function handleSubirImagen(e: React.ChangeEvent<HTMLInputElement>) {
@@ -227,7 +366,9 @@ export function CirculoChatRoom({
     setAvisoChat(null);
 
     let rutaFinal = "";
+    let previewOptimista = "";
     try {
+      previewOptimista = await leerArchivoComoDataUrl(file);
       const supabase = createClient();
       const ext = (file.name.split(".").pop() ?? "jpg")
         .toLowerCase()
@@ -241,10 +382,10 @@ export function CirculoChatRoom({
       if (!error) {
         rutaFinal = path;
       } else if (file.size <= 350_000) {
-        rutaFinal = await leerArchivoComoDataUrl(file);
+        rutaFinal = previewOptimista;
       } else {
         setAvisoChat(
-          "No se pudo subir la imagen al bucket `chat` (verifica que el archivo sea menor a 5 MB)."
+          "No se pudo subir la imagen al bucket `chat` (verifica que pese menos de 5 MB)."
         );
         setSubiendoImg(false);
         return;
@@ -255,6 +396,21 @@ export function CirculoChatRoom({
       return;
     }
 
+    const tempId = -Date.now();
+    const imgOptimista: MensajeChatUI = {
+      id: tempId,
+      circulo_id: circuloId,
+      autor_id: userId,
+      tipo: "imagen",
+      contenido: "Imagen compartida",
+      adjunto_ruta: previewOptimista || rutaFinal,
+      eliminado: false,
+      creado_en: new Date().toISOString(),
+      optimista: true,
+    };
+
+    setMensajesExtra((prev) => [...prev, imgOptimista]);
+
     const res = await enviarMensajeCirculoAction({
       circuloId,
       tipo: "imagen",
@@ -263,13 +419,29 @@ export function CirculoChatRoom({
     });
     setSubiendoImg(false);
 
-    if (!res.ok) {
+    if (!res.ok || !res.mensajeInsertado) {
+      setMensajesExtra((prev) => prev.filter((m) => m.id !== tempId));
       setAvisoChat(res.error ?? "No se pudo enviar la imagen.");
+      return;
     }
+
+    const confirmado = res.mensajeInsertado;
+    setMensajesExtra((prev) => {
+      if (prev.some((m) => m.id === confirmado.id)) {
+        return prev.filter((m) => m.id !== tempId);
+      }
+      return prev.map((m) => (m.id === tempId ? confirmado : m));
+    });
+
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "nuevo_mensaje",
+      payload: confirmado,
+    });
   }
 
   function abrirModalReporteMensaje(msg: MensajeChat) {
-    setMensajeReportadoId(msg.id);
+    setMensajeReportadoId(msg.id > 0 ? msg.id : null);
     setPerfilObjetivoMod(msg.autor_id ?? otrosIntegrantes[0]?.perfil_id ?? "");
     setDescripcionReporte("");
     setModalModeracion(true);
@@ -307,7 +479,6 @@ export function CirculoChatRoom({
     );
     if (res.ok) {
       setModalModeracion(false);
-      router.refresh();
     }
   }
 
@@ -332,22 +503,34 @@ export function CirculoChatRoom({
               <h1 className="truncate text-titulo-2 text-foreground">
                 {circuloNombre}
               </h1>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-etiqueta font-semibold",
-                  estadoRealtime === "en_vivo"
-                    ? "bg-verde-soft text-verde"
-                    : "bg-sunken text-text-secondary"
-                )}
-              >
+
+              {estadoRealtime === "reconectando" ? (
+                <button
+                  type="button"
+                  onClick={() => setReintentoClave((c) => c + 1)}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-pill bg-primary-soft px-2.5 py-0.5 text-etiqueta font-semibold text-primary-strong hover:bg-primary-soft/80"
+                >
+                  <RefreshCw className="size-3" aria-hidden="true" />
+                  Reconectar chat
+                </button>
+              ) : (
                 <span
                   className={cn(
-                    "size-1.5 rounded-pill",
-                    estadoRealtime === "en_vivo" ? "bg-verde" : "bg-oro"
+                    "inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-etiqueta font-semibold",
+                    estadoRealtime === "en_vivo"
+                      ? "bg-verde-soft text-verde"
+                      : "bg-sunken text-text-secondary"
                   )}
-                />
-                {estadoRealtime === "en_vivo" ? "En vivo" : "Sincronizando"}
-              </span>
+                >
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-pill",
+                      estadoRealtime === "en_vivo" ? "bg-verde" : "bg-oro"
+                    )}
+                  />
+                  {estadoRealtime === "en_vivo" ? "En vivo" : "Conectando…"}
+                </span>
+              )}
             </div>
 
             <p className="truncate text-etiqueta text-verde">
@@ -421,15 +604,18 @@ export function CirculoChatRoom({
           }
 
           const esMio = msg.autor_id === userId;
-          const autor = msg.autor_id ? integranteMap.get(msg.autor_id) : null;
-          const esAutorArrendador = autor?.rol === "arrendador";
+          const autor = msg.autor_id
+            ? (integranteMap.get(msg.autor_id) ?? autoresExtra[msg.autor_id] ?? null)
+            : null;
+          const esAutorArrendador = Boolean(autor?.esArrendador);
 
           return (
             <div
               key={msg.id}
               className={cn(
                 "group flex items-end gap-2.5",
-                esMio ? "justify-end" : "justify-start"
+                esMio ? "justify-end" : "justify-start",
+                msg.optimista && "opacity-80"
               )}
             >
               {!esMio && (
@@ -478,7 +664,10 @@ export function CirculoChatRoom({
                 )}
 
                 {msg.contenido &&
-                  !(msg.tipo === "imagen" && msg.contenido === "Imagen compartida") && (
+                  !(
+                    msg.tipo === "imagen" &&
+                    msg.contenido === "Imagen compartida"
+                  ) && (
                     <p className="whitespace-pre-wrap break-words text-cuerpo">
                       {msg.contenido}
                     </p>
@@ -492,8 +681,12 @@ export function CirculoChatRoom({
                       : "text-text-secondary"
                   )}
                 >
-                  <span>{formatearHoraMensaje(msg.creado_en)}</span>
-                  {!esMio && (
+                  <span>
+                    {msg.optimista
+                      ? "Enviando…"
+                      : formatearHoraMensaje(msg.creado_en)}
+                  </span>
+                  {!esMio && msg.id > 0 && (
                     <button
                       type="button"
                       aria-label="Reportar este mensaje"
@@ -548,7 +741,7 @@ export function CirculoChatRoom({
         <button
           type="submit"
           aria-label="Enviar mensaje"
-          disabled={enviando || !texto.trim()}
+          disabled={!texto.trim()}
           className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-pill bg-primary text-primary-foreground transition-colors hover:bg-primary-strong disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Send className="size-5" aria-hidden="true" />
@@ -608,7 +801,9 @@ export function CirculoChatRoom({
                 }
                 className="h-10 rounded-btn border border-input bg-surface px-3 text-pequeno text-foreground"
               >
-                <option value="fraude">Intento de fraude o cobro anticipado</option>
+                <option value="fraude">
+                  Intento de fraude o cobro anticipado
+                </option>
                 <option value="acoso">Acoso o falta de respeto</option>
                 <option value="contenido_inapropiado">
                   Contenido inapropiado

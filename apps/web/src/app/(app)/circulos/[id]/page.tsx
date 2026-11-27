@@ -8,6 +8,7 @@ import {
   cargarDetalleCirculoActivo,
 } from "@/lib/circulos-queries";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 import { InvitacionPendienteCard } from "./invitacion-pendiente-card";
 
 export const metadata: Metadata = {
@@ -23,15 +24,12 @@ export default async function CirculoDetallePage({
   params,
   searchParams,
 }: CirculoDetallePageProps) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const [user, { id }] = await Promise.all([obtenerUsuarioServidor(), params]);
   if (!user) {
     redirect(`/login?next=/circulos/${id}`);
   }
+
+  const supabase = await createClient();
 
   const [query, bandeja, detalle] = await Promise.all([
     searchParams,
@@ -64,7 +62,6 @@ export default async function CirculoDetallePage({
 
   return (
     <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[270px_minmax(0,1fr)_310px] xl:items-start xl:gap-4">
-      {/* Columna 1: Lista de círculos (visible en escritorio amplio W06) */}
       <CirculosSidebar
         circulos={bandeja.circulos}
         circuloActivoId={detalle.circulo.id}
@@ -72,7 +69,6 @@ export default async function CirculoDetallePage({
         className="hidden xl:flex xl:h-[calc(100dvh-72px)]"
       />
 
-      {/* En pantallas medianas/móvil (07-chat.png), el resumen de acuerdo va arriba del chat */}
       <div className="xl:hidden">
         <AcuerdoPanel
           circuloId={detalle.circulo.id}
@@ -89,8 +85,8 @@ export default async function CirculoDetallePage({
         />
       </div>
 
-      {/* Columna 2: Chat en tiempo real con Supabase Realtime */}
       <CirculoChatRoom
+        key={detalle.circulo.id}
         circuloId={detalle.circulo.id}
         circuloNombre={nombreVisible}
         cupoMaximo={detalle.circulo.cupo}
@@ -100,7 +96,6 @@ export default async function CirculoDetallePage({
         mensajesIniciales={detalle.mensajesIniciales}
       />
 
-      {/* Columna 3: Panel Acuerdo del círculo en escritorio W06 */}
       <AcuerdoPanel
         circuloId={detalle.circulo.id}
         circuloNombre={nombreVisible}

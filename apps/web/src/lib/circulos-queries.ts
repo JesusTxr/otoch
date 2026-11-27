@@ -347,7 +347,7 @@ export async function cargarDetalleCirculoActivo(
       esActivo
         ? supabase
             .from("acuerdos")
-            .select("*")
+            .select("*, aportaciones(*)")
             .eq("circulo_id", circuloId)
             .order("version", { ascending: false })
             .limit(1)
@@ -399,39 +399,38 @@ export async function cargarDetalleCirculoActivo(
   let aportaciones: Aportacion[] = [];
 
   if (acuerdoRes.data) {
-    const rawAc = acuerdoRes.data;
+    const rawAc = acuerdoRes.data as Record<string, unknown>;
     const clausulasArr = Array.isArray(rawAc.clausulas)
       ? rawAc.clausulas.map((c: unknown) => String(c))
       : [];
 
     acuerdoActual = {
-      id: rawAc.id,
-      circulo_id: rawAc.circulo_id,
-      version: rawAc.version,
+      id: String(rawAc.id),
+      circulo_id: String(rawAc.circulo_id),
+      version: Number(rawAc.version),
       renta_total: Number(rawAc.renta_total),
       deposito_total: Number(rawAc.deposito_total),
       servicios_estimados: Number(rawAc.servicios_estimados),
-      fecha_inicio: rawAc.fecha_inicio,
-      duracion_meses: rawAc.duracion_meses,
+      fecha_inicio: String(rawAc.fecha_inicio),
+      duracion_meses: Number(rawAc.duracion_meses),
       clausulas: clausulasArr,
       estado: rawAc.estado as EstadoAcuerdo,
-      pdf_ruta: rawAc.pdf_ruta,
-      creado_en: rawAc.creado_en,
-      actualizado_en: rawAc.actualizado_en,
+      pdf_ruta: (rawAc.pdf_ruta as string | null) ?? null,
+      creado_en: String(rawAc.creado_en),
+      actualizado_en: String(rawAc.actualizado_en),
     };
 
-    const { data: aportRes } = await supabase
-      .from("aportaciones")
-      .select("*")
-      .eq("acuerdo_id", rawAc.id);
+    const aportRaw = Array.isArray(rawAc.aportaciones)
+      ? (rawAc.aportaciones as Record<string, unknown>[])
+      : [];
 
-    aportaciones = (aportRes ?? []).map((ap) => ({
-      acuerdo_id: ap.acuerdo_id,
-      perfil_id: ap.perfil_id,
+    aportaciones = aportRaw.map((ap) => ({
+      acuerdo_id: String(ap.acuerdo_id),
+      perfil_id: String(ap.perfil_id),
       porcentaje: Number(ap.porcentaje),
       monto_renta: Number(ap.monto_renta),
       monto_deposito: Number(ap.monto_deposito),
-      aceptado_en: ap.aceptado_en,
+      aceptado_en: (ap.aceptado_en as string | null) ?? null,
     }));
   }
 

@@ -6,6 +6,7 @@ import {
   cargarUniversidadesConCoords,
 } from "@/lib/inmuebles-queries";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 import type { RolUsuario } from "@/types/database";
 import { ExplorarClient } from "./explorar-client";
 
@@ -14,14 +15,12 @@ export const metadata: Metadata = {
 };
 
 export default async function ExplorarPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/explorar");
   }
+
+  const supabase = await createClient();
 
   const [
     { data: perfil },
@@ -60,7 +59,6 @@ export default async function ExplorarPage() {
       .filter((id): id is string => Boolean(id))
   );
 
-  // Excluir inmuebles propios del arrendador o ya evaluados por el usuario
   const disponibles = inmueblesPublicados.filter(
     (inm) => inm.arrendador_id !== user.id && !yaEvaluadosSet.has(inm.id)
   );

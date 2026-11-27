@@ -11,12 +11,13 @@ import {
   invitarRoomieSchema,
   responderInvitacionSchema,
 } from "@/lib/validations/circulos";
-import type { MotivoReporte } from "@/types/database";
+import type { MensajeChat, MotivoReporte } from "@/types/database";
 
 export interface CirculoActionResult {
   ok: boolean;
   circuloId?: string;
   acuerdoId?: string;
+  mensajeInsertado?: MensajeChat;
   message?: string;
   error?: string;
 }
@@ -402,30 +403,35 @@ export async function enviarMensajeCirculoAction(rawInput: {
       return { ok: false, error: "Sesión expirada." };
     }
 
-    const { error } = await supabase.from("mensajes").insert({
-      circulo_id: parsed.data.circuloId,
-      autor_id: user.id,
-      tipo: parsed.data.tipo,
-      contenido: parsed.data.contenido?.trim()
-        ? parsed.data.contenido.trim()
-        : parsed.data.tipo === "imagen"
-          ? "Imagen compartida"
+    const { data: insertado, error } = await supabase
+      .from("mensajes")
+      .insert({
+        circulo_id: parsed.data.circuloId,
+        autor_id: user.id,
+        tipo: parsed.data.tipo,
+        contenido: parsed.data.contenido?.trim()
+          ? parsed.data.contenido.trim()
+          : parsed.data.tipo === "imagen"
+            ? "Imagen compartida"
+            : null,
+        adjunto_ruta: parsed.data.adjuntoRuta?.trim()
+          ? parsed.data.adjuntoRuta.trim()
           : null,
-      adjunto_ruta: parsed.data.adjuntoRuta?.trim()
-        ? parsed.data.adjuntoRuta.trim()
-        : null,
-    });
+      })
+      .select("*")
+      .single();
 
-    if (error) {
+    if (error || !insertado) {
       return {
         ok: false,
         error: "No se pudo enviar el mensaje. Verifica que seas miembro activo.",
       };
     }
 
-    revalidatePath(`/circulos/${parsed.data.circuloId}`);
-    revalidatePath("/circulos");
-    return { ok: true };
+    return {
+      ok: true,
+      mensajeInsertado: insertado as MensajeChat,
+    };
   } catch {
     return { ok: false, error: "Error de conexión al enviar el mensaje." };
   }

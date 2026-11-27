@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { obtenerGaleriaInmueble } from "@/lib/inmuebles-media";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 import type { EstadoInmueble, TipoInmueble } from "@/types/database";
 import {
   MisInmueblesClient,
@@ -25,20 +26,46 @@ interface MisInmueblesPageProps {
 export default async function MisInmueblesPage({
   searchParams,
 }: MisInmueblesPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/mis-inmuebles");
   }
 
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("id, rol, nombre, apellidos")
-    .eq("id", user.id)
-    .maybeSingle();
+  const supabase = await createClient();
+
+  // Primer bloque 100% paralelo (incluye perfil + inmuebles + decisiones + matches)
+  const [
+    params,
+    { data: perfil },
+    { data: misInmuebles },
+    { data: misDecisiones },
+    { data: misMatches },
+  ] = await Promise.all([
+    searchParams,
+    supabase
+      .from("perfiles")
+      .select("id, rol, nombre, apellidos")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("inmuebles")
+      .select(
+        "id, titulo, colonia, tipo, renta_mensual, capacidad, habitaciones, estado, disponible_desde, creado_en"
+      )
+      .eq("arrendador_id", user.id)
+      .order("creado_en", { ascending: false }),
+    supabase
+      .from("swipes")
+      .select("inmueble_id, perfil_objetivo_id, decision")
+      .eq("autor_id", user.id)
+      .not("perfil_objetivo_id", "is", null),
+    supabase
+      .from("matches")
+      .select("inmueble_id, perfil_a_id")
+      .eq("tipo", "estudiante_inmueble")
+      .eq("perfil_b_id", user.id)
+      .eq("estado", "activo"),
+  ]);
 
   if (!perfil) {
     redirect("/onboarding");
@@ -65,33 +92,9 @@ export default async function MisInmueblesPage({
     );
   }
 
-  const [params, { data: misInmuebles }, { data: misDecisiones }, { data: misMatches }] =
-    await Promise.all([
-      searchParams,
-      supabase
-        .from("inmuebles")
-        .select(
-          "id, titulo, colonia, tipo, renta_mensual, capacidad, habitaciones, estado, disponible_desde, creado_en"
-        )
-        .eq("arrendador_id", user.id)
-        .order("creado_en", { ascending: false }),
-      supabase
-        .from("swipes")
-        .select("inmueble_id, perfil_objetivo_id, decision")
-        .eq("autor_id", user.id)
-        .not("perfil_objetivo_id", "is", null),
-      supabase
-        .from("matches")
-        .select("inmueble_id, perfil_a_id")
-        .eq("tipo", "estudiante_inmueble")
-        .eq("perfil_b_id", user.id)
-        .eq("estado", "activo"),
-    ]);
-
   const listaInmuebles = misInmuebles ?? [];
   const inmuebleIds = listaInmuebles.map((i) => i.id);
 
-  // Fotos y swipes de estudiantes sobre los inmuebles del arrendador
   const [fotosRes, swipesEstudiantesRes] =
     inmuebleIds.length > 0
       ? await Promise.all([

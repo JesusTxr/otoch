@@ -6,32 +6,28 @@ import { MatchesPanel } from "@/components/otoch/matches-panel";
 import { Button } from "@/components/ui/button";
 import { cargarBandejaCirculosYMatches } from "@/lib/circulos-queries";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 
 export const metadata: Metadata = {
   title: "Mis matches · Otoch",
 };
 
 export default async function MatchesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/matches");
   }
 
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const supabase = await createClient();
+
+  const [{ data: perfil }, bandeja] = await Promise.all([
+    supabase.from("perfiles").select("id").eq("id", user.id).maybeSingle(),
+    cargarBandejaCirculosYMatches(supabase, user.id),
+  ]);
 
   if (!perfil) {
     redirect("/onboarding");
   }
-
-  const bandeja = await cargarBandejaCirculosYMatches(supabase, user.id);
 
   return (
     <div className="flex flex-col gap-6">

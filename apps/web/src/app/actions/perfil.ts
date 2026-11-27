@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { ONBOARDING_COOKIE } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/server";
 import {
   onboardingPayloadSchema,
@@ -154,6 +156,14 @@ export async function completarOnboardingAction(
         };
       }
     }
+
+    const cookieStore = await cookies();
+    cookieStore.set(ONBOARDING_COOKIE, user.id, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+    });
 
     revalidatePath("/", "layout");
     revalidatePath("/perfil");

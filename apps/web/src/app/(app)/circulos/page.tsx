@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cargarBandejaCirculosYMatches } from "@/lib/circulos-queries";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 
 export const metadata: Metadata = {
   title: "Círculos y matches · Otoch",
@@ -20,29 +21,22 @@ interface CirculosIndexPageProps {
 export default async function CirculosPage({
   searchParams,
 }: CirculosIndexPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/circulos");
   }
 
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const supabase = await createClient();
+
+  const [params, { data: perfil }, bandeja] = await Promise.all([
+    searchParams,
+    supabase.from("perfiles").select("id").eq("id", user.id).maybeSingle(),
+    cargarBandejaCirculosYMatches(supabase, user.id),
+  ]);
 
   if (!perfil) {
     redirect("/onboarding");
   }
-
-  const [params, bandeja] = await Promise.all([
-    searchParams,
-    cargarBandejaCirculosYMatches(supabase, user.id),
-  ]);
 
   const totalMatches =
     bandeja.matchesInmuebles.length + bandeja.matchesRoomies.length;

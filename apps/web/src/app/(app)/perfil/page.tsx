@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerUsuarioServidor } from "@/lib/supabase/session";
 import type {
   Municipio,
   Perfil,
@@ -21,27 +22,17 @@ interface PerfilPageProps {
 }
 
 export default async function PerfilPage({ searchParams }: PerfilPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await obtenerUsuarioServidor();
   if (!user) {
     redirect("/login?next=/perfil");
   }
 
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
+  const supabase = await createClient();
 
-  if (!perfil) {
-    redirect("/onboarding");
-  }
-
+  // Todas las consultas independientes corren en un único bloque paralelo
   const [
     params,
+    perfilRes,
     estRes,
     prefRes,
     arrRes,
@@ -53,6 +44,7 @@ export default async function PerfilPage({ searchParams }: PerfilPageProps) {
     inmueblesCountRes,
   ] = await Promise.all([
     searchParams,
+    supabase.from("perfiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("perfiles_estudiante")
       .select("*")
@@ -98,11 +90,15 @@ export default async function PerfilPage({ searchParams }: PerfilPageProps) {
       .eq("arrendador_id", user.id),
   ]);
 
+  if (!perfilRes.data) {
+    redirect("/onboarding");
+  }
+
   return (
     <PerfilClient
       email={user.email ?? ""}
       bienvenida={params.bienvenida === "1"}
-      perfil={perfil as Perfil}
+      perfil={perfilRes.data as Perfil}
       estudiante={(estRes.data as PerfilEstudiante | null) ?? null}
       preferencias={(prefRes.data as PreferenciasConvivencia | null) ?? null}
       arrendador={(arrRes.data as PerfilArrendador | null) ?? null}

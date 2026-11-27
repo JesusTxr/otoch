@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { ONBOARDING_COOKIE } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, registroSchema } from "@/lib/validations/auth";
 
@@ -82,8 +83,17 @@ export async function iniciarSesionAction(
       .eq("id", data.user.id)
       .maybeSingle();
 
+    const cookieStore = await cookies();
     if (!perfil) {
+      cookieStore.delete(ONBOARDING_COOKIE);
       destino = "/onboarding";
+    } else {
+      cookieStore.set(ONBOARDING_COOKIE, data.user.id, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+      });
     }
   } catch {
     return {
@@ -181,7 +191,11 @@ export async function registrarUsuarioAction(
 
 export async function cerrarSesionAction(): Promise<void> {
   try {
-    const supabase = await createClient();
+    const [supabase, cookieStore] = await Promise.all([
+      createClient(),
+      cookies(),
+    ]);
+    cookieStore.delete(ONBOARDING_COOKIE);
     await supabase.auth.signOut();
   } catch {
     // Ignorar si ya expiró
