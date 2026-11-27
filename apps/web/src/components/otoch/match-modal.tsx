@@ -90,8 +90,8 @@ export function MatchModal({
                 Seguir explorando
               </Button>
               <Button asChild>
-                <Link href="/circulos" onClick={onClose}>
-                  Abrir círculos
+                <Link href="/circulos?vista=matches" onClick={onClose}>
+                  Ir a Matches y Círculos
                 </Link>
               </Button>
             </div>

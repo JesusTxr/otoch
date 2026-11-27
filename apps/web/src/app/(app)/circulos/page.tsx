@@ -1,37 +1,119 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { MessageCircle, ShieldCheck } from "lucide-react";
+import { redirect } from "next/navigation";
+import { Heart, MessageCircle } from "lucide-react";
+import { CirculosSidebar } from "@/components/otoch/circulos-sidebar";
+import { MatchesPanel } from "@/components/otoch/matches-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cargarBandejaCirculosYMatches } from "@/lib/circulos-queries";
+import { createClient } from "@/lib/supabase/server";
 
-export default function CirculosPage() {
+export const metadata: Metadata = {
+  title: "Círculos y matches · Otoch",
+};
+
+interface CirculosIndexPageProps {
+  searchParams: Promise<{ vista?: string }>;
+}
+
+export default async function CirculosPage({
+  searchParams,
+}: CirculosIndexPageProps) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?next=/circulos");
+  }
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!perfil) {
+    redirect("/onboarding");
+  }
+
+  const [params, bandeja] = await Promise.all([
+    searchParams,
+    cargarBandejaCirculosYMatches(supabase, user.id),
+  ]);
+
+  const totalMatches =
+    bandeja.matchesInmuebles.length + bandeja.matchesRoomies.length;
+  const mostrarMatchesDirecto =
+    params.vista === "matches" || bandeja.circulos.length === 0;
+  const primerCirculoActivo = bandeja.circulos.find(
+    (c) => c.miEstado === "activo"
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-titulo-web text-foreground">Círculos</h1>
-        <p className="mt-1 text-pequeno text-text-secondary">
-          Grupos con roomies y arrendador para acordar renta en partes iguales
-        </p>
-      </div>
+    <div className="grid items-start gap-6 lg:grid-cols-[310px_minmax(0,1fr)]">
+      <CirculosSidebar
+        circulos={bandeja.circulos}
+        totalMatches={totalMatches}
+        className="lg:min-h-[calc(100dvh-110px)]"
+      />
 
-      <Card className="items-start gap-4 rounded-xl p-8">
-        <div className="flex size-12 items-center justify-center rounded-sm bg-primary-soft text-primary-strong">
-          <MessageCircle className="size-6" aria-hidden="true" />
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-titulo-web text-foreground">
+              {mostrarMatchesDirecto
+                ? "Matches y creación de círculos"
+                : "Selecciona un círculo"}
+            </h1>
+            <p className="mt-0.5 text-pequeno text-text-secondary">
+              Abre un círculo a partir de un match de inmueble o invita roomies
+              compatibles para dividir la renta.
+            </p>
+          </div>
+
+          {primerCirculoActivo && (
+            <Button size="sm" asChild>
+              <Link href={`/circulos/${primerCirculoActivo.id}`}>
+                <MessageCircle className="size-4" aria-hidden="true" />
+                Abrir último chat
+              </Link>
+            </Button>
+          )}
         </div>
-        <h2 className="text-titulo-1 text-foreground">
-          Aún no tienes círculos activos
-        </h2>
-        <p className="max-w-[560px] text-cuerpo text-text-secondary">
-          Cuando hagas match con otros estudiantes y un inmueble verificado, aquí
-          podrán platicar en tiempo real y dividir la renta en partes iguales.
-        </p>
-        <Button asChild>
-          <Link href="/explorar">Explorar inmuebles</Link>
-        </Button>
-      </Card>
 
-      <div className="flex items-center gap-2 rounded-sm bg-verde-soft px-4 py-3 text-pequeno font-semibold text-verde">
-        <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-        Nunca deposites antes de firmar el contrato dentro de Otoch.
+        {!mostrarMatchesDirecto && primerCirculoActivo && (
+          <Card className="flex-col items-start justify-between gap-4 rounded-lg bg-primary-soft/60 p-5 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-pill bg-primary text-primary-foreground">
+                <Heart className="size-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-cuerpo font-semibold text-foreground">
+                  Tienes {bandeja.circulos.length} círculo(s) y {totalMatches}{" "}
+                  match(es) activos
+                </p>
+                <p className="text-etiqueta text-text-secondary">
+                  Selecciona cualquier círculo en la columna izquierda para abrir
+                  el chat en tiempo real y su pre-acuerdo PDF.
+                </p>
+              </div>
+            </div>
+            <Button size="sm" asChild>
+              <Link href={`/circulos/${primerCirculoActivo.id}`}>
+                Entrar al chat
+              </Link>
+            </Button>
+          </Card>
+        )}
+
+        <MatchesPanel
+          circulos={bandeja.circulos}
+          matchesInmuebles={bandeja.matchesInmuebles}
+          matchesRoomies={bandeja.matchesRoomies}
+        />
       </div>
     </div>
   );

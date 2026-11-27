@@ -5,6 +5,7 @@ const PROTECTED_PREFIXES = [
   "/explorar",
   "/inmuebles",
   "/mis-inmuebles",
+  "/matches",
   "/roomies",
   "/circulos",
   "/perfil",

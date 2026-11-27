@@ -10,6 +10,17 @@ export type EstadoInmueble = "borrador" | "publicado" | "pausado" | "rentado";
 export type DecisionSwipe = "me_interesa" | "descartar";
 export type TipoMatch = "estudiante_inmueble" | "roomies";
 export type EstadoMatch = "activo" | "archivado";
+export type EstadoCirculo = "abierto" | "en_acuerdo" | "cerrado" | "cancelado";
+export type RolCirculo = "arrendador" | "estudiante";
+export type EstadoMiembro = "invitado" | "activo" | "salio";
+export type TipoMensaje = "texto" | "imagen" | "sistema";
+export type EstadoAcuerdo = "borrador" | "propuesto" | "aceptado" | "rechazado";
+export type MotivoReporte =
+  | "fraude"
+  | "acoso"
+  | "contenido_inapropiado"
+  | "suplantacion"
+  | "otro";
 export type TipoVerificacion =
   | "correo_institucional"
   | "identidad"
@@ -149,6 +160,115 @@ export interface Match {
   compatibilidad: number | null;
   estado: EstadoMatch;
   creado_en: string;
+}
+
+export interface Circulo {
+  id: string;
+  inmueble_id: string;
+  creado_por: string;
+  nombre: string | null;
+  cupo: number;
+  estado: EstadoCirculo;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface MiembroCirculo {
+  circulo_id: string;
+  perfil_id: string;
+  rol: RolCirculo;
+  estado: EstadoMiembro;
+  unido_en: string | null;
+}
+
+export interface MiembroCirculoDetalle extends MiembroCirculo {
+  nombreCompleto: string;
+  iniciales: string;
+  esUsuarioActual: boolean;
+  verificado: boolean;
+  subtitulo: string;
+  telefono: string | null;
+}
+
+export interface MensajeChat {
+  id: number;
+  circulo_id: string;
+  autor_id: string | null;
+  tipo: TipoMensaje;
+  contenido: string | null;
+  adjunto_ruta: string | null;
+  eliminado: boolean;
+  creado_en: string;
+}
+
+export interface Acuerdo {
+  id: string;
+  circulo_id: string;
+  version: number;
+  renta_total: number;
+  deposito_total: number;
+  servicios_estimados: number;
+  fecha_inicio: string;
+  duracion_meses: number;
+  clausulas: string[];
+  estado: EstadoAcuerdo;
+  pdf_ruta: string | null;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface Aportacion {
+  acuerdo_id: string;
+  perfil_id: string;
+  porcentaje: number;
+  monto_renta: number;
+  monto_deposito: number;
+  aceptado_en: string | null;
+}
+
+export interface CirculoResumenLista {
+  id: string;
+  nombre: string;
+  estado: EstadoCirculo;
+  cupo: number;
+  miEstado: EstadoMiembro;
+  miRol: RolCirculo;
+  inmuebleId: string;
+  inmuebleTitulo: string;
+  inmuebleColonia: string;
+  rentaMensual: number;
+  avatares: { iniciales: string; nombre: string; esArrendador: boolean }[];
+  ultimoMensajeTexto: string;
+  ultimoMensajeFecha: string;
+  estudiantesActivos: number;
+}
+
+export interface MatchInmuebleItem {
+  matchId: string;
+  inmuebleId: string;
+  inmuebleTitulo: string;
+  inmuebleColonia: string;
+  rentaMensual: number;
+  capacidad: number;
+  contraparteId: string;
+  contraparteNombre: string;
+  contraparteIniciales: string;
+  contraparteEsArrendador: boolean;
+  circuloExistenteId: string | null;
+  creadoEn: string;
+}
+
+export interface MatchRoomieItem {
+  matchId: string;
+  roomieId: string;
+  nombreCompleto: string;
+  iniciales: string;
+  universidadSiglas: string;
+  carrera: string;
+  presupuestoMax: number | null;
+  compatibilidad: number;
+  verificado: boolean;
+  creadoEn: string;
 }
 
 export interface RoomieCandidato {
