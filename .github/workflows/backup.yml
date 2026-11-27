@@ -1,5 +1,4 @@
-# Plantilla · Respaldo lógico horario de la base de datos hacia Cloudflare R2 (regla 3-2-1)
-# Copiar a .github/workflows/backup.yml en el repositorio y configurar los secretos indicados.
+# Respaldo lógico horario de la base de datos hacia Cloudflare R2 (regla 3-2-1)
 name: respaldo-horario-bd
 
 on:
@@ -15,8 +14,24 @@ jobs:
   respaldo:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
     steps:
+      - name: Verificar secretos de respaldo configurados
+        id: check_secrets
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_AGE_RECIPIENT" ] || [ -z "$R2_BUCKET" ]; then
+            echo "::notice::Secretos de respaldo (SUPABASE_DB_URL / BACKUP_AGE_RECIPIENT / R2_BUCKET) aún no configurados en GitHub; omitiendo ejecución programada."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Instalar cliente de PostgreSQL 17 y age
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
@@ -24,9 +39,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client-17 age
 
       - name: Generar respaldo cifrado
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           STAMP=$(date -u +%Y%m%dT%H%MZ)
           pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
@@ -34,13 +47,11 @@ jobs:
           echo "ARCHIVO=otoch_${STAMP}.dump.age" >> "$GITHUB_ENV"
 
       - name: Subir a Cloudflare R2 (prefijo horario)
+        if: steps.check_secrets.outputs.ready == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
         run: |
-          aws s3 cp "$ARCHIVO" "s3://${{ secrets.R2_BUCKET }}/bd/horario/$ARCHIVO" \
-            --endpoint-url "${{ secrets.R2_ENDPOINT }}"
-
-# La retención (48 horarias, 30 diarias, 12 semanales y 12 mensuales) se aplica con reglas de
-# ciclo de vida del bucket y con un trabajo diario que copia el último respaldo a los prefijos diario/semanal/mensual.
+          aws s3 cp "$ARCHIVO" "s3://${R2_BUCKET}/bd/horario/$ARCHIVO" \
+            --endpoint-url "${R2_ENDPOINT}"

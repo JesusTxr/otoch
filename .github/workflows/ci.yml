@@ -1,5 +1,4 @@
-# Plantilla · Integración continua para pull requests y ramas principales
-# Copiar a .github/workflows/ci.yml en el repositorio.
+# Integración continua para pull requests y ramas principales · Otoch v1.0.0
 name: ci
 
 on:
@@ -24,6 +23,9 @@ jobs:
       - name: Pruebas unitarias con cobertura
         run: pnpm test -- --coverage
       - name: Compilación
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ci_placeholder' }}
         run: pnpm --filter web build
       - name: Auditoría de dependencias (falla con vulnerabilidades altas o críticas)
         run: pnpm audit --audit-level=high
@@ -42,10 +44,14 @@ jobs:
       - uses: supabase/setup-cli@v1
       - run: pnpm install --frozen-lockfile
       - name: Base de datos local con migraciones y RLS
-        run: supabase start && supabase db reset
+        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime && supabase db reset
       - name: Verificar que todas las tablas tengan RLS (lección LA-01)
         run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
           psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -tAc \
             "select count(*) from pg_tables where schemaname='public' and not rowsecurity" | grep -qx 0
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - name: Pruebas extremo a extremo (Playwright)
+        run: pnpm test:e2e

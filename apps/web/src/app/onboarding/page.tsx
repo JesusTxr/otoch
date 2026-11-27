@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PublicNavbar } from "@/components/otoch/public-navbar";
 import { createClient } from "@/lib/supabase/server";
-import { obtenerResumenSesion } from "@/lib/supabase/session";
+import {
+  obtenerResumenSesion,
+  obtenerUsuarioServidor,
+} from "@/lib/supabase/session";
 import type { Municipio, RolRegistro, Universidad } from "@/types/database";
 import { OnboardingWizard } from "./onboarding-wizard";
 
@@ -17,14 +20,13 @@ interface OnboardingPageProps {
 export default async function OnboardingPage({
   searchParams,
 }: OnboardingPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obtenerUsuarioServidor();
 
   if (!user) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   const { data: perfilExistente } = await supabase
     .from("perfiles")
